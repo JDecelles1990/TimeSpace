@@ -57,6 +57,23 @@ Press **Enter** or click **Create ⚡**.
 
 ---
 
+## 📋 Activity Tab
+A live dashboard showing all scheduled items split by type, updated every second:
+- **⏳ All Timers** (left column):
+  - Live countdown (`HH:MM:SS remaining`) for every active timer.
+  - `⏸️` badge for paused timers, `🔁` badge for repeating timers.
+  - **Detail card**: Click any timer to see its name, remaining time, scheduled fire time, repeat flag, and category.
+  - **⏯️ Pause/Resume**: Instantly pause or resume the selected timer.
+  - **🗑️ Delete**: Remove the selected timer permanently.
+- **📅 All Rendez-vous** (right column):
+  - Live countdown for every scheduled appointment.
+  - Category icon (`💼 🩺 📞 🏠 🎉`) and `🔁` repeat badge shown inline.
+  - **Detail card**: Click any event to see name, remaining time, date/time, repeat rule, category, and early-alert lead time.
+  - **🗑️ Delete**: Cancel the selected appointment.
+- Both columns show a **counter badge** (e.g. `3 active`, `2 scheduled`) that dims to `None` when the list is empty.
+
+---
+
 ## ⚙️ Settings Tab
 - **Alarm Sound Pattern**:
   - *Gentle Chime*: Melodic C-Major ascending arpeggio.

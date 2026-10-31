@@ -187,6 +187,11 @@ class MainApp(tk.Tk):
         notebook.add(tab_settings, text="  Settings ⚙️  ")
         self._init_settings_tab(tab_settings)
 
+        # Tab 4: Activity Log
+        tab_activity = tk.Frame(notebook, bg=COLORS["bg_dark"], pady=4)
+        notebook.add(tab_activity, text="  Activity 📋  ")
+        self._init_activity_tab(tab_activity)
+
     def _init_timer_tab(self, parent):
         # Quick Presets
         p_frame = tk.Frame(parent, bg=COLORS["bg_dark"])
@@ -420,6 +425,198 @@ class MainApp(tk.Tk):
 
         tk.Button(s_box, text="Save Settings", bg=COLORS["accent_success"], fg="white", font=(FONT_FAMILY, 9, "bold"),
                   relief="flat", cursor="hand2", padx=12, pady=4, command=self._save_settings).pack(anchor="e", pady=4)
+
+    def _init_activity_tab(self, parent):
+        """Activity tab: live view of All Timers and All Rendez-vous with detail panel."""
+        parent.columnconfigure(0, weight=1)
+        parent.columnconfigure(1, weight=1)
+        parent.rowconfigure(1, weight=1)
+
+        # ── Timers column ──────────────────────────────────────────────────────
+        timer_box = tk.LabelFrame(
+            parent, text=" ⏳ All Timers ", font=(FONT_FAMILY, 9, "bold"),
+            bg=COLORS["bg_dark"], fg=COLORS["accent"], padx=6, pady=4
+        )
+        timer_box.grid(row=0, column=0, rowspan=2, sticky="nsew", padx=(4, 2), pady=4)
+
+        # Counter badge
+        self.lbl_timer_count = tk.Label(
+            timer_box, text="0 active", font=(FONT_FAMILY, 8),
+            bg=COLORS["surface_light"], fg=COLORS["accent"], padx=6, pady=1
+        )
+        self.lbl_timer_count.pack(anchor="e", pady=(0, 4))
+
+        # Listbox + scrollbar
+        t_list_frame = tk.Frame(timer_box, bg=COLORS["bg_dark"])
+        t_list_frame.pack(fill="both", expand=True)
+
+        t_scrollbar = tk.Scrollbar(t_list_frame, orient="vertical", bg=COLORS["surface"])
+        t_scrollbar.pack(side="right", fill="y")
+
+        self.activity_timer_lb = tk.Listbox(
+            t_list_frame, bg=COLORS["surface"], fg=COLORS["text"],
+            selectbackground=COLORS["accent"], borderwidth=0,
+            font=(FONT_FAMILY, 8), yscrollcommand=t_scrollbar.set,
+            activestyle="none", cursor="hand2"
+        )
+        self.activity_timer_lb.pack(fill="both", expand=True)
+        t_scrollbar.config(command=self.activity_timer_lb.yview)
+        self.activity_timer_lb.bind("<<ListboxSelect>>", self._on_activity_timer_select)
+
+        # Detail card for selected timer
+        self.timer_detail = tk.Label(
+            timer_box, text="Select a timer to see details.",
+            font=(FONT_FAMILY, 8), bg=COLORS["surface"], fg=COLORS["text_muted"],
+            anchor="w", justify="left", padx=6, pady=4, wraplength=240
+        )
+        self.timer_detail.pack(fill="x", pady=(4, 2))
+
+        # Action buttons row
+        t_btn_row = tk.Frame(timer_box, bg=COLORS["bg_dark"])
+        t_btn_row.pack(fill="x", pady=(2, 0))
+
+        tk.Button(
+            t_btn_row, text="⏯️ Pause/Resume", font=(FONT_FAMILY, 7, "bold"),
+            bg=COLORS["surface_light"], fg=COLORS["text"], relief="flat",
+            cursor="hand2", padx=6, pady=2,
+            command=self._activity_pause_timer
+        ).pack(side="left", padx=(0, 4))
+
+        tk.Button(
+            t_btn_row, text="🗑️ Delete", font=(FONT_FAMILY, 7),
+            bg=COLORS["surface_light"], fg=COLORS["accent_danger"], relief="flat",
+            cursor="hand2", padx=6, pady=2,
+            command=self._activity_delete_timer
+        ).pack(side="left")
+
+        # ── Rendez-vous column ────────────────────────────────────────────────
+        rdv_box = tk.LabelFrame(
+            parent, text=" 📅 All Rendez-vous ", font=(FONT_FAMILY, 9, "bold"),
+            bg=COLORS["bg_dark"], fg=COLORS["accent"], padx=6, pady=4
+        )
+        rdv_box.grid(row=0, column=1, rowspan=2, sticky="nsew", padx=(2, 4), pady=4)
+
+        # Counter badge
+        self.lbl_rdv_count = tk.Label(
+            rdv_box, text="0 scheduled", font=(FONT_FAMILY, 8),
+            bg=COLORS["surface_light"], fg=COLORS["accent"], padx=6, pady=1
+        )
+        self.lbl_rdv_count.pack(anchor="e", pady=(0, 4))
+
+        # Listbox + scrollbar
+        r_list_frame = tk.Frame(rdv_box, bg=COLORS["bg_dark"])
+        r_list_frame.pack(fill="both", expand=True)
+
+        r_scrollbar = tk.Scrollbar(r_list_frame, orient="vertical", bg=COLORS["surface"])
+        r_scrollbar.pack(side="right", fill="y")
+
+        self.activity_rdv_lb = tk.Listbox(
+            r_list_frame, bg=COLORS["surface"], fg=COLORS["text"],
+            selectbackground=COLORS["accent"], borderwidth=0,
+            font=(FONT_FAMILY, 8), yscrollcommand=r_scrollbar.set,
+            activestyle="none", cursor="hand2"
+        )
+        self.activity_rdv_lb.pack(fill="both", expand=True)
+        r_scrollbar.config(command=self.activity_rdv_lb.yview)
+        self.activity_rdv_lb.bind("<<ListboxSelect>>", self._on_activity_rdv_select)
+
+        # Detail card for selected rendez-vous
+        self.rdv_detail = tk.Label(
+            rdv_box, text="Select an event to see details.",
+            font=(FONT_FAMILY, 8), bg=COLORS["surface"], fg=COLORS["text_muted"],
+            anchor="w", justify="left", padx=6, pady=4, wraplength=240
+        )
+        self.rdv_detail.pack(fill="x", pady=(4, 2))
+
+        # Action button
+        r_btn_row = tk.Frame(rdv_box, bg=COLORS["bg_dark"])
+        r_btn_row.pack(fill="x", pady=(2, 0))
+
+        tk.Button(
+            r_btn_row, text="🗑️ Delete", font=(FONT_FAMILY, 7),
+            bg=COLORS["surface_light"], fg=COLORS["accent_danger"], relief="flat",
+            cursor="hand2", padx=6, pady=2,
+            command=self._activity_delete_rdv
+        ).pack(side="left")
+
+        # Internal caches used by action callbacks (filled by _refresh_loop)
+        self._activity_timer_items: list = []
+        self._activity_rdv_items: list = []
+
+    # ── Activity Tab helpers ──────────────────────────────────────────────────
+
+    def _fmt_remain(self, item, now: float) -> str:
+        """Return 'HH:MM:SS remaining' or 'PAUSED HH:MM:SS' string."""
+        if item.is_paused:
+            rem = int(item.remaining_paused)
+            prefix = "⏸️ PAUSED — "
+        else:
+            rem = max(0, int(item.target_time - now))
+            prefix = ""
+        m, s = divmod(rem, 60)
+        h, m = divmod(m, 60)
+        return f"{prefix}{h:02d}:{m:02d}:{s:02d}"
+
+    def _fmt_target(self, item) -> str:
+        """Return a human-readable scheduled time."""
+        dt = datetime.datetime.fromtimestamp(item.target_time)
+        return dt.strftime("%b %d  %H:%M:%S")
+
+    def _on_activity_timer_select(self, _event=None):
+        sel = self.activity_timer_lb.curselection()
+        if not sel or sel[0] >= len(self._activity_timer_items):
+            return
+        it = self._activity_timer_items[sel[0]]
+        now = __import__("time").time()
+        cat = it.category if it.category and it.category != "General" else "—"
+        rep = "Yes" if it.repeat_sec > 0 else "No"
+        lines = [
+            f"📌 {it.name}",
+            f"⏱ Remaining: {self._fmt_remain(it, now)}",
+            f"🔔 Fires at:  {self._fmt_target(it)}",
+            f"🔁 Repeat:    {rep}",
+            f"🏷 Category:  {cat}",
+        ]
+        self.timer_detail.config(text="\n".join(lines), fg=COLORS["text"])
+
+    def _on_activity_rdv_select(self, _event=None):
+        sel = self.activity_rdv_lb.curselection()
+        if not sel or sel[0] >= len(self._activity_rdv_items):
+            return
+        it = self._activity_rdv_items[sel[0]]
+        now = __import__("time").time()
+        cat = it.category if it.category and it.category != "General" else "—"
+        rep = it.repeat_rule.capitalize() if it.repeat_rule and it.repeat_rule != "none" else "None"
+        lead = f"{it.lead_time_min}m before" if it.lead_time_min else "At event time"
+        lines = [
+            f"📌 {it.name}",
+            f"⏱ Remaining: {self._fmt_remain(it, now)}",
+            f"📅 Date/Time: {self._fmt_target(it)}",
+            f"🔁 Repeat:    {rep}",
+            f"🏷 Category:  {cat}",
+            f"⏰ Alert:     {lead}",
+        ]
+        self.rdv_detail.config(text="\n".join(lines), fg=COLORS["text"])
+
+    def _activity_pause_timer(self):
+        sel = self.activity_timer_lb.curselection()
+        if sel and sel[0] < len(self._activity_timer_items):
+            it = self._activity_timer_items[sel[0]]
+            self.scheduler.toggle_pause(it.id)
+
+    def _activity_delete_timer(self):
+        sel = self.activity_timer_lb.curselection()
+        if sel and sel[0] < len(self._activity_timer_items):
+            it = self._activity_timer_items[sel[0]]
+            self.scheduler.remove_item(it.id)
+            self.timer_detail.config(text="Select a timer to see details.", fg=COLORS["text_muted"])
+
+    def _activity_delete_rdv(self):
+        sel = self.activity_rdv_lb.curselection()
+        if sel and sel[0] < len(self._activity_rdv_items):
+            it = self._activity_rdv_items[sel[0]]
+            self.scheduler.remove_item(it.id)
+            self.rdv_detail.config(text="Select an event to see details.", fg=COLORS["text_muted"])
 
     def _on_volume_change(self, val):
         self.lbl_volume.config(text=f"Master Alarm Volume: {val}%")
@@ -667,7 +864,70 @@ class MainApp(tk.Tk):
         if hasattr(self, "tray") and self.tray:
             self.tray.update_tooltip(tooltip)
 
+        # Update Activity Tab (only if it has been built)
+        if hasattr(self, "activity_timer_lb"):
+            self._refresh_activity_tab(now)
+
         self.after(1000, self._refresh_loop)
+
+    def _refresh_activity_tab(self, now: float):
+        """Refresh the Activity tab's Timer and Rendez-vous listboxes."""
+        timers = [it for it in self.scheduler.items if it.kind == "timer"]
+        rdvs   = [it for it in self.scheduler.items if it.kind == "rendez-vous"]
+
+        # ── Timers list ──────────────────────────────────────────────────────
+        t_sel = self.activity_timer_lb.curselection()
+        self.activity_timer_lb.delete(0, tk.END)
+        self._activity_timer_items = timers
+
+        for it in timers:
+            rem = int(it.remaining_paused if it.is_paused else max(0.0, it.target_time - now))
+            m, s = divmod(rem, 60)
+            h, m = divmod(m, 60)
+            paused_badge = " ⏸️" if it.is_paused else ""
+            rep_badge    = " 🔁" if it.repeat_sec > 0 else ""
+            self.activity_timer_lb.insert(
+                tk.END,
+                f"⏳{paused_badge}{rep_badge} {it.name} — {h:02d}:{m:02d}:{s:02d}"
+            )
+
+        # Restore selection
+        if t_sel and t_sel[0] < self.activity_timer_lb.size():
+            self.activity_timer_lb.selection_set(t_sel[0])
+            self._on_activity_timer_select()
+
+        t_count = len(timers)
+        self.lbl_timer_count.config(
+            text=f"{t_count} active" if t_count else "None active",
+            fg=COLORS["accent"] if t_count else COLORS["text_muted"]
+        )
+
+        # ── Rendez-vous list ─────────────────────────────────────────────────
+        r_sel = self.activity_rdv_lb.curselection()
+        self.activity_rdv_lb.delete(0, tk.END)
+        self._activity_rdv_items = rdvs
+
+        for it in rdvs:
+            rem = int(it.remaining_paused if it.is_paused else max(0.0, it.target_time - now))
+            m, s = divmod(rem, 60)
+            h, m = divmod(m, 60)
+            cat_icon = it.category.split()[0] if it.category and it.category != "General" else "📌"
+            rep_badge = " 🔁" if it.repeat_rule and it.repeat_rule != "none" else ""
+            self.activity_rdv_lb.insert(
+                tk.END,
+                f"{cat_icon}{rep_badge} {it.name} — {h:02d}:{m:02d}:{s:02d}"
+            )
+
+        # Restore selection
+        if r_sel and r_sel[0] < self.activity_rdv_lb.size():
+            self.activity_rdv_lb.selection_set(r_sel[0])
+            self._on_activity_rdv_select()
+
+        r_count = len(rdvs)
+        self.lbl_rdv_count.config(
+            text=f"{r_count} scheduled" if r_count else "None scheduled",
+            fg=COLORS["accent"] if r_count else COLORS["text_muted"]
+        )
 
     def _check_missed_alarms(self):
         if self.scheduler.missed_items:

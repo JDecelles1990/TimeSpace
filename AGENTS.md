@@ -35,3 +35,4 @@ A lightweight desktop Python application for timers and calendar-based appointme
 - [x] **Slice 19**: Relative Date Chips (`Today`, `Tomorrow`, `This Friday`, `Next Monday`).
 - [x] **Slice 20**: Early Warning Lead-Time Reminders (`5m`, `10m`, `15m` before).
 - [x] **Slice 21**: Category Badges (`💼 Work`, `🩺 Health`, `📞 Call`, `🏠 Personal`, `🎉 Social`).
+- [x] **Slice 22**: Activity Tab — live two-column dashboard showing All Timers and All Rendez-vous with detail cards and delete/pause actions.
