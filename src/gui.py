@@ -107,7 +107,7 @@ class MainApp(tk.Tk):
         btn_go.pack(side="right")
 
         self.smart_feedback = tk.Label(
-            container, text='Try: "Ring in 15 min", "RDV at 4PM", "Call Linda at 7:15 tomorrow morning"',
+            container, text='Try: "Ring in 15 min" · "Call Sam in 2 days" · "Dentist next Friday at 2pm" · "RDV at 4PM"',
             font=(FONT_FAMILY, 8), bg=COLORS["bg_dark"], fg=COLORS["text_muted"]
         )
         self.smart_feedback.pack(anchor="w", pady=(2, 0))
@@ -117,7 +117,7 @@ class MainApp(tk.Tk):
         parsed = NaturalParser.parse(query)
         if not parsed:
             self.smart_feedback.config(
-                text='❌ Unrecognized. Try: "Ring in 15 min", "RDV at 4PM", or "Call Linda at 7:15 tomorrow morning"',
+                text='❌ Unrecognized. Try: "Ring in 15 min", "Call Sam in 2 days", "Dentist next Friday at 2pm", "RDV at 4PM"',
                 fg=COLORS["accent_danger"]
             )
             return

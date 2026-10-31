@@ -15,6 +15,13 @@ At the top of the window, schedule timers and appointments in plain English:
 - **`Timer for 30m meditation`** -> 30-minute timer named *"meditation"*.
 - **`RDV tomorrow at 10am dentist`** -> Schedules a dentist appointment for tomorrow at 10:00.
 - **`at 8 tonight netflix`** -> Schedules for tonight at 20:00.
+- **`Call Sam in 2 days`** -> Rendez-vous in 2 days at noon (12:00).
+- **`Call Sam in 2 days at 3pm`** -> Rendez-vous in 2 days at 15:00.
+- **`Doctor in 1 week`** -> Rendez-vous in 7 days at noon.
+- **`Doctor in 1 week at 10am`** -> Rendez-vous in 7 days at 10:00.
+- **`Dentist next Friday`** -> Rendez-vous on the next coming Friday at noon.
+- **`Dentist next Friday at 14:00`** -> Rendez-vous on the next coming Friday at 14:00.
+- **`Meeting on Wednesday at 3pm`** -> Rendez-vous on the next Wednesday at 15:00.
 
 Press **Enter** or click **Create ⚡**.
 
