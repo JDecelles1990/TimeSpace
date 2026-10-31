@@ -16,7 +16,7 @@ class MiniCalendar(tk.Frame):
         self.selected_date = today
         self.event_dates: Set[datetime.date] = set()
 
-        self._cal = calendar.Calendar(firstweekday=0)  # Monday first
+        self._cal = calendar.Calendar(firstweekday=6)  # Sunday first
         self._build_ui()
         self.render_calendar()
 
@@ -68,10 +68,11 @@ class MiniCalendar(tk.Frame):
         self.grid_frame = tk.Frame(self, bg=COLORS["bg_dark"])
         self.grid_frame.pack(fill="x")
 
-        # Weekday headers (Mo, Tu, We, Th, Fr, Sa, Su)
-        day_names = ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"]
+        # Weekday headers (Su, Mo, Tu, We, Th, Fr, Sa)
+        day_names = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"]
         for col_idx, d_name in enumerate(day_names):
-            color = COLORS["accent_warning"] if col_idx >= 5 else COLORS["text_muted"]
+            # Highlight Sunday (col 0) and Saturday (col 6)
+            color = COLORS["accent_warning"] if col_idx in (0, 6) else COLORS["text_muted"]
             lbl = tk.Label(
                 self.grid_frame, text=d_name, font=(FONT_FAMILY, 8, "bold"),
                 bg=COLORS["bg_dark"], fg=color, width=4, pady=2

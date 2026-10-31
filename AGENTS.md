@@ -25,11 +25,11 @@ A lightweight desktop Python application for timers and calendar-based appointme
 - [x] **Slice 9**: Recurring Rendez-vous (Daily, Weekly, Monthly) and RFC 5545 iCalendar (`.ics`) Import/Export.
 - [x] **Slice 10**: Auto-launch on Windows startup toggle in Settings via `winreg`.
 - [x] **Slice 11**: Catch-up alert for missed alarms when starting up or waking from sleep.
-- [x] **Slice 12**: Pomodoro Focus Mode (25m Focus / 5m Short Break / 15m Long Break with daily streak counter).
+- [ ] **Slice 12**: ~~Pomodoro Focus Mode~~ (removed by user request).
 - [x] **Slice 13**: Play / Pause / Resume controls for running countdowns directly on the Circular Ring and List.
 - [x] **Slice 14**: Master Audio Volume Slider (0-100%) with true Windows MCI hardware level control and audio fade-in.
 - [x] **Slice 15**: Sleep & PC Wake-up Clock Drift Detector with overdue alarm notification banner.
-- [x] **Slice 16**: Enhanced System Tray Quick Actions (`🍅 25m Focus`, `☕ 5m Break`, `⏯️ Pause/Resume`).
+- [ ] **Slice 16**: ~~Enhanced System Tray Quick Actions (`🍅 25m Focus`, `☕ 5m Break`, `⏯️ Pause/Resume`)~~ — Pomodoro tray shortcuts removed; `⏯️ Pause/Resume` remains.
 - [x] **Slice 17**: Interactive Dark-Mode Mini-Calendar Grid with month navigation, event dots, and Day Inspector.
 - [x] **Slice 18**: Ergonomic Big-Buttons Time Picker (`+`/`–` steppers, minute chips `:00`, `:15`, `:30`, `:45`, and time presets).
 - [x] **Slice 19**: Relative Date Chips (`Today`, `Tomorrow`, `This Friday`, `Next Monday`).

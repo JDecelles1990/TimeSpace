@@ -7,14 +7,10 @@ class TrayManager:
         self,
         on_toggle: Callable,
         on_exit: Callable,
-        on_quick_pomodoro: Optional[Callable] = None,
-        on_quick_break: Optional[Callable] = None,
         on_toggle_pause: Optional[Callable] = None
     ):
         self.on_toggle = on_toggle
         self.on_exit = on_exit
-        self.on_quick_pomodoro = on_quick_pomodoro
-        self.on_quick_break = on_quick_break
         self.on_toggle_pause = on_toggle_pause
         self.icon = None
 
@@ -52,10 +48,6 @@ class TrayManager:
                 Menu.SEPARATOR,
             ]
 
-            if self.on_quick_pomodoro:
-                menu_items.append(item("🍅 Start 25m Pomodoro", lambda: self.on_quick_pomodoro()))
-            if self.on_quick_break:
-                menu_items.append(item("☕ Start 5m Break", lambda: self.on_quick_break()))
             if self.on_toggle_pause:
                 menu_items.append(item("⏯️ Pause / Resume Active Timer", lambda: self.on_toggle_pause()))
 

@@ -29,16 +29,6 @@ Press **Enter** or click **Create ⚡**.
 
 ---
 
-## 🍅 Pomodoro Technique Mode
-Boost focus and avoid burnout using structured intervals:
-- **`🍅 25m Focus`**: Starts a 25-minute deep focus session.
-- **`☕ 5m Short Break`**: 5-minute rest interval to stretch and recharge.
-- **`🌴 15m Long Break`**: 15-minute extended rest after completing multiple focus cycles.
-- **Daily Streak Counter**: Automatically counts completed Pomodoro sessions (`Completed today: 🍅 x 3`).
-- **Post-Session Prompt**: When a 25m Pomodoro finishes, the app celebrates and asks if you'd like to immediately begin a 5m break.
-
----
-
 ## ⏳ Timers & Quick Presets
 - **Quick Presets**: Single click on **30 Minutes**, **1 Hour**, or **2 Hours**.
 - **Custom Timer**: Enter task name, hours, minutes, seconds, check **Repeat automatically** if desired, and click **Start Timer**.
@@ -85,8 +75,6 @@ Boost focus and avoid burnout using structured intervals:
 - **`Ctrl + F7`**: Global toggle hotkey. Brings the window to the front or hides it to the tray from anywhere in Windows.
 - **Close Button `[X]`**: Hides to the tray; timers continue running uninterrupted.
 - **Tray Quick Actions (Right-Click Context Menu)**:
-  - `🍅 Start 25m Pomodoro`
-  - `☕ Start 5m Break`
   - `⏯️ Pause / Resume Active Timer`
   - `Show / Hide (Ctrl+F7)`
   - `Exit App`

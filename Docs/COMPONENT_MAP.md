@@ -28,7 +28,7 @@ Timer & Rendez-vous/
     ├── storage.py             # Persistence layer for JSON state
     ├── scheduler.py           # Thread-safe scheduler with Pause/Resume and sleep drift detector
     ├── alarm_dialog.py        # Top-most alert popup (Dismiss, 5m/15m Snooze)
-    ├── tray.py                # System tray icon with live hover tooltip & quick Pomodoro triggers
+    ├── tray.py                # System tray icon with live hover tooltip & pause/resume quick action
     └── gui.py                 # Tkinter Dark Mode interface and event wiring
 ```
 
@@ -36,7 +36,7 @@ Timer & Rendez-vous/
 
 | Module | Interacts With | Description |
 |---|---|---|
-| `gui.py` | `circular_ring.py`, `calendar_widget.py`, `time_picker.py`, `natural_parser.py`, `scheduler.py`, `tray.py` | Main UI orchestrating Pomodoro intervals, calendar, time picker, and smart input. |
+| `gui.py` | `circular_ring.py`, `calendar_widget.py`, `time_picker.py`, `natural_parser.py`, `scheduler.py`, `tray.py` | Main UI orchestrating timer presets, calendar, time picker, and smart input. |
 | `calendar_widget.py` | `gui.py`, `scheduler.py` | Monthly calendar grid, date selection chips, and event day indicator dots. |
 | `time_picker.py` | `gui.py` | Ergonomic hour/minute steppers, minute interval chips, and time presets. |
 | `circular_ring.py` | `gui.py`, `config.py` | Renders circular canvas progress bar, handles active depletion, and displays paused state. |
@@ -46,4 +46,4 @@ Timer & Rendez-vous/
 | `notifications.py` | `alarm_dialog.py`, `gui.py` | Dispatches Windows Action Center native toast notifications. |
 | `sound.py` | `gui.py`, `alarm_dialog.py`, `storage.py` | Audio playback engine with volume slider (0-100%) and 15-second gradual fade-in. |
 | `scheduler.py` | `gui.py`, `storage.py` | Background timer loop with Pause/Resume methods and clock drift sleep detection. |
-| `tray.py` | `gui.py` | System tray icon with quick Pomodoro triggers, active timer pause, and live hover tooltip. |
+| `tray.py` | `gui.py` | System tray icon with active timer pause/resume and live hover tooltip. |

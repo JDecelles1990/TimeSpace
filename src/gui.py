@@ -38,8 +38,6 @@ class MainApp(tk.Tk):
         self.tray = TrayManager(
             on_toggle=self.toggle_visibility,
             on_exit=self.quit_app,
-            on_quick_pomodoro=self._start_pomodoro_focus,
-            on_quick_break=self._start_pomodoro_short_break,
             on_toggle_pause=self._toggle_active_timer_pause
         )
         self.tray.start()
@@ -174,9 +172,9 @@ class MainApp(tk.Tk):
         notebook = ttk.Notebook(self)
         notebook.pack(fill="x", padx=16, pady=4)
 
-        # Tab 1: Timers & Pomodoro
+        # Tab 1: Timers
         tab_timer = tk.Frame(notebook, bg=COLORS["bg_dark"], pady=4)
-        notebook.add(tab_timer, text="  Timers & Focus ⏳  ")
+        notebook.add(tab_timer, text="  Timers ⏳  ")
         self._init_timer_tab(tab_timer)
 
         # Tab 2: Rendez-vous
@@ -190,50 +188,6 @@ class MainApp(tk.Tk):
         self._init_settings_tab(tab_settings)
 
     def _init_timer_tab(self, parent):
-        # Pomodoro Section
-        pomo_box = tk.LabelFrame(parent, text=" 🍅 Pomodoro Technique ", font=(FONT_FAMILY, 9, "bold"),
-                                 bg=COLORS["bg_dark"], fg=COLORS["accent_warning"], padx=10, pady=4)
-        pomo_box.pack(fill="x", pady=2)
-
-        pomo_row = tk.Frame(pomo_box, bg=COLORS["bg_dark"])
-        pomo_row.pack(fill="x", pady=2)
-
-        tk.Button(
-            pomo_row, text="🍅 25m Focus", font=(FONT_FAMILY, 9, "bold"),
-            bg="#b91c1c", fg="white", activebackground="#991b1b",
-            relief="flat", cursor="hand2", padx=10, pady=4,
-            command=self._start_pomodoro_focus
-        ).pack(side="left", padx=(0, 6))
-
-        tk.Button(
-            pomo_row, text="☕ 5m Short Break", font=(FONT_FAMILY, 9),
-            bg=COLORS["surface"], fg=COLORS["text"], activebackground=COLORS["accent"],
-            relief="flat", cursor="hand2", padx=8, pady=4,
-            command=self._start_pomodoro_short_break
-        ).pack(side="left", padx=(0, 6))
-
-        tk.Button(
-            pomo_row, text="🌴 15m Long Break", font=(FONT_FAMILY, 9),
-            bg=COLORS["surface"], fg=COLORS["text"], activebackground=COLORS["accent"],
-            relief="flat", cursor="hand2", padx=8, pady=4,
-            command=self._start_pomodoro_long_break
-        ).pack(side="left")
-
-        stats_row = tk.Frame(pomo_box, bg=COLORS["bg_dark"])
-        stats_row.pack(fill="x", pady=(3, 0))
-        pomo_count = self.settings.get("pomodoro_count", 0)
-        self.lbl_pomo_count = tk.Label(
-            stats_row, text=f"Completed today: 🍅 x {pomo_count}",
-            font=(FONT_FAMILY, 8), bg=COLORS["bg_dark"], fg=COLORS["text_muted"]
-        )
-        self.lbl_pomo_count.pack(side="left")
-
-        tk.Button(
-            stats_row, text="Reset Count", font=(FONT_FAMILY, 7),
-            bg=COLORS["surface_light"], fg=COLORS["text_muted"], relief="flat",
-            command=self._reset_pomodoro_count
-        ).pack(side="right")
-
         # Quick Presets
         p_frame = tk.Frame(parent, bg=COLORS["bg_dark"])
         p_frame.pack(fill="x", pady=2)
@@ -506,23 +460,6 @@ class MainApp(tk.Tk):
         set_startup_enabled(self.startup_var.get())
         messagebox.showinfo("Saved", "Preferences saved successfully!")
 
-    def _start_pomodoro_focus(self):
-        self.scheduler.add_item("timer", "🍅 Pomodoro Focus", 25 * 60, original_duration=25 * 60)
-        show_toast("🍅 Pomodoro Started", "25 minutes of deep focus initiated!")
-
-    def _start_pomodoro_short_break(self):
-        self.scheduler.add_item("timer", "☕ Short Break", 5 * 60, original_duration=5 * 60)
-        show_toast("☕ Break Started", "Take 5 minutes to stretch and relax!")
-
-    def _start_pomodoro_long_break(self):
-        self.scheduler.add_item("timer", "🌴 Long Break", 15 * 60, original_duration=15 * 60)
-        show_toast("🌴 Long Break Started", "Enjoy 15 minutes of rest!")
-
-    def _reset_pomodoro_count(self):
-        self.settings["pomodoro_count"] = 0
-        Storage.save_settings(self.settings)
-        self.lbl_pomo_count.config(text="Completed today: 🍅 x 0")
-
     def _toggle_active_timer_pause(self):
         active = self.scheduler.get_active_timer()
         if active:
@@ -756,13 +693,6 @@ class MainApp(tk.Tk):
         )
 
     def _on_item_triggered(self, item: ScheduledItem):
-        # If a Pomodoro focus timer finishes, increment stats
-        if "Pomodoro Focus" in item.name:
-            count = self.settings.get("pomodoro_count", 0) + 1
-            self.settings["pomodoro_count"] = count
-            Storage.save_settings(self.settings)
-            self.lbl_pomo_count.config(text=f"Completed today: 🍅 x {count}")
-
         self.after(0, lambda: self._popup_alarm(item))
 
     def _popup_alarm(self, item: ScheduledItem):
@@ -772,10 +702,6 @@ class MainApp(tk.Tk):
 
         def dismiss():
             self.sound_player.stop_alarm()
-            # If Pomodoro finished, offer break
-            if "Pomodoro Focus" in item.name:
-                if messagebox.askyesno("🍅 Focus Done!", "Great work! Would you like to start a 5-minute break now?"):
-                    self._start_pomodoro_short_break()
 
         def snooze(minutes: int):
             self.sound_player.stop_alarm()
