@@ -6,6 +6,7 @@ from typing import Dict, Any, List
 DATA_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data")
 SETTINGS_FILE = os.path.join(DATA_DIR, "settings.json")
 REMINDERS_FILE = os.path.join(DATA_DIR, "reminders.json")
+HISTORY_FILE = os.path.join(DATA_DIR, "history.json")
 
 DEFAULT_SETTINGS = {
     "sound_type": "gentle",         # "gentle", "digital", "urgent", "custom"
@@ -14,8 +15,9 @@ DEFAULT_SETTINGS = {
     "default_snooze_minutes": 5,    # 5 or 15
     "gradual_escalation": True,     # Gentle pace/volume ramping to urgent
     "start_on_boot": False,
-    "pomodoro_count": 0,            # Completed pomodoro sessions
-    "auto_start_breaks": False
+    "hud_enabled": False,
+    "hud_x": 120,
+    "hud_y": 80
 }
 
 class Storage:
@@ -59,3 +61,39 @@ class Storage:
         cls._ensure_dir()
         with open(REMINDERS_FILE, "w", encoding="utf-8") as f:
             json.dump(reminders, f, indent=2)
+
+    @classmethod
+    def load_history(cls) -> List[dict]:
+        """Load list of completed/dismissed events."""
+        cls._ensure_dir()
+        if not os.path.exists(HISTORY_FILE):
+            return []
+        try:
+            with open(HISTORY_FILE, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            return []
+
+    @classmethod
+    def add_history_entry(cls, entry: dict):
+        """Append an entry to history and limit to latest 100 entries."""
+        cls._ensure_dir()
+        history = cls.load_history()
+        history.insert(0, entry)
+        if len(history) > 100:
+            history = history[:100]
+        try:
+            with open(HISTORY_FILE, "w", encoding="utf-8") as f:
+                json.dump(history, f, indent=2)
+        except Exception:
+            pass
+
+    @classmethod
+    def clear_history(cls):
+        """Clear the history log."""
+        cls._ensure_dir()
+        try:
+            with open(HISTORY_FILE, "w", encoding="utf-8") as f:
+                json.dump([], f, indent=2)
+        except Exception:
+            pass

@@ -36,3 +36,5 @@ A lightweight desktop Python application for timers and calendar-based appointme
 - [x] **Slice 20**: Early Warning Lead-Time Reminders (`5m`, `10m`, `15m` before).
 - [x] **Slice 21**: Category Badges (`💼 Work`, `🩺 Health`, `📞 Call`, `🏠 Personal`, `🎉 Social`).
 - [x] **Slice 22**: Activity Tab — live two-column dashboard showing All Timers and All Rendez-vous with detail cards and delete/pause actions.
+- [x] **Slice 23**: Floating Mini HUD (compact draggable always-on-top multi-monitor widget with SLA urgency states and live countdown).
+- [x] **Slice 24**: IT Support & Helpdesk Module (SLA presets `15m`/`30m`/`45m`/`2h`/`4h`, ticket & SLA categories, and in-app Completed History log).

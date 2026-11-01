@@ -7,11 +7,13 @@ class TrayManager:
         self,
         on_toggle: Callable,
         on_exit: Callable,
-        on_toggle_pause: Optional[Callable] = None
+        on_toggle_pause: Optional[Callable] = None,
+        on_toggle_hud: Optional[Callable] = None
     ):
         self.on_toggle = on_toggle
         self.on_exit = on_exit
         self.on_toggle_pause = on_toggle_pause
+        self.on_toggle_hud = on_toggle_hud
         self.icon = None
 
     def start(self):
@@ -50,6 +52,8 @@ class TrayManager:
 
             if self.on_toggle_pause:
                 menu_items.append(item("⏯️ Pause / Resume Active Timer", lambda: self.on_toggle_pause()))
+            if self.on_toggle_hud:
+                menu_items.append(item("📌 Toggle Mini HUD", lambda: self.on_toggle_hud()))
 
             menu_items.extend([
                 Menu.SEPARATOR,

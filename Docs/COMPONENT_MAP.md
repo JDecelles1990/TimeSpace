@@ -28,7 +28,8 @@ Timer & Rendez-vous/
     ├── storage.py             # Persistence layer for JSON state
     ├── scheduler.py           # Thread-safe scheduler with Pause/Resume and sleep drift detector
     ├── alarm_dialog.py        # Top-most alert popup (Dismiss, 5m/15m Snooze)
-    ├── tray.py                # System tray icon with live hover tooltip & pause/resume quick action
+    ├── mini_hud.py            # Floating compact draggable always-on-top multi-monitor HUD widget
+    ├── tray.py                # System tray icon with live hover tooltip, HUD toggle & pause/resume
     └── gui.py                 # Tkinter Dark Mode interface and event wiring
 ```
 
@@ -36,7 +37,8 @@ Timer & Rendez-vous/
 
 | Module | Interacts With | Description |
 |---|---|---|
-| `gui.py` | `circular_ring.py`, `calendar_widget.py`, `time_picker.py`, `natural_parser.py`, `scheduler.py`, `tray.py` | Main UI orchestrating timer presets, calendar, time picker, and smart input. |
+| `gui.py` | `circular_ring.py`, `calendar_widget.py`, `time_picker.py`, `natural_parser.py`, `scheduler.py`, `tray.py`, `mini_hud.py` | Main UI orchestrating timer presets, SLA warnings, calendar, time picker, and HUD. |
+| `mini_hud.py` | `gui.py`, `config.py` | Draggable always-on-top compact widget with SLA urgency coloring and live countdown. |
 | `calendar_widget.py` | `gui.py`, `scheduler.py` | Monthly calendar grid, date selection chips, and event day indicator dots. |
 | `time_picker.py` | `gui.py` | Ergonomic hour/minute steppers, minute interval chips, and time presets. |
 | `circular_ring.py` | `gui.py`, `config.py` | Renders circular canvas progress bar, handles active depletion, and displays paused state. |

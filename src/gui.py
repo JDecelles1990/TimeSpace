@@ -19,6 +19,7 @@ from src.calendar_widget import MiniCalendar
 from src.time_picker import BigButtonsTimePicker
 from src.startup import is_startup_enabled, set_startup_enabled
 from src.notifications import show_toast
+from src.mini_hud import FloatingMiniHUD
 
 class MainApp(tk.Tk):
     def __init__(self, start_minimized: bool = False):
@@ -38,9 +39,14 @@ class MainApp(tk.Tk):
         self.tray = TrayManager(
             on_toggle=self.toggle_visibility,
             on_exit=self.quit_app,
-            on_toggle_pause=self._toggle_active_timer_pause
+            on_toggle_pause=self._toggle_active_timer_pause,
+            on_toggle_hud=self._toggle_hud
         )
         self.tray.start()
+
+        # Mini HUD state
+        self.hud: Optional[FloatingMiniHUD] = None
+        self.hud_enabled = self.settings.get("hud_enabled", False)
 
         # Build UI Components
         self._build_styles()
@@ -56,6 +62,8 @@ class MainApp(tk.Tk):
 
         # Check for missed alarms from before launch
         self.after(500, self._check_missed_alarms)
+        if self.hud_enabled:
+            self.after(300, self._show_hud)
 
         if start_minimized:
             self.withdraw()
@@ -78,6 +86,16 @@ class MainApp(tk.Tk):
         hotkey_badge = tk.Label(header, text=f"Toggle: {HOTKEY.upper()}", font=(FONT_FAMILY, 9),
                                 bg=COLORS["surface_light"], fg=COLORS["accent"], padx=8, pady=3)
         hotkey_badge.pack(side="right")
+
+        hud_text = "📌 Mini HUD: ON" if self.hud_enabled else "📌 Mini HUD: OFF"
+        hud_color = COLORS["accent"] if self.hud_enabled else COLORS["text_muted"]
+        self.btn_hud_toggle = tk.Button(
+            header, text=hud_text, font=(FONT_FAMILY, 8, "bold"),
+            bg=COLORS["surface_light"], fg=hud_color,
+            activebackground=COLORS["accent"], relief="flat", cursor="hand2",
+            padx=8, pady=2, command=self._toggle_hud
+        )
+        self.btn_hud_toggle.pack(side="right", padx=(0, 8))
 
     def _build_smart_input_bar(self):
         """Natural Language Quick Input Box."""
@@ -211,6 +229,30 @@ class MainApp(tk.Tk):
                 )
             ).pack(side="left", padx=(0, 8))
 
+        # IT Support & Helpdesk SLA Quick Presets
+        sla_frame = tk.Frame(parent, bg=COLORS["bg_dark"])
+        sla_frame.pack(fill="x", pady=(4, 2))
+        tk.Label(sla_frame, text="🎫 IT Support & SLA Presets:", font=(FONT_FAMILY, 9, "bold"),
+                 bg=COLORS["bg_dark"], fg=COLORS["accent_warning"]).pack(anchor="w")
+
+        sla_btn_row = tk.Frame(sla_frame, bg=COLORS["bg_dark"])
+        sla_btn_row.pack(fill="x", pady=2)
+        for label, mins, cat in [
+            ("⚡ 15m SLA", 15, "🚨 SLA Warning"),
+            ("🚨 30m SLA", 30, "🚨 SLA Warning"),
+            ("📞 45m Callback", 45, "📞 Callback"),
+            ("🔄 2h Follow-up", 120, "🔄 Follow-up"),
+            ("🛠️ 4h Maint", 240, "🛠️ Maintenance")
+        ]:
+            tk.Button(
+                sla_btn_row, text=label, font=(FONT_FAMILY, 8, "bold"),
+                bg=COLORS["surface"], fg=COLORS["text"], activebackground=COLORS["accent"],
+                relief="flat", cursor="hand2", padx=6, pady=3,
+                command=lambda m=mins, l=label, c=cat: self.scheduler.add_item(
+                    "timer", l, m * 60, original_duration=m * 60, category=c
+                )
+            ).pack(side="left", padx=(0, 6))
+
         # Custom Timer
         c_frame = tk.LabelFrame(parent, text=" Custom Timer ", font=(FONT_FAMILY, 9),
                                 bg=COLORS["bg_dark"], fg=COLORS["accent"], padx=10, pady=4)
@@ -291,11 +333,11 @@ class MainApp(tk.Tk):
 
         tk.Label(meta_grid, text="Category:", font=(FONT_FAMILY, 8),
                  bg=COLORS["bg_dark"], fg=COLORS["text_muted"]).grid(row=0, column=0, sticky="w", pady=2)
-        self.rdv_category_var = tk.StringVar(value="💼 Work")
+        self.rdv_category_var = tk.StringVar(value="🎫 Ticket")
         combo_cat = ttk.Combobox(
             meta_grid, textvariable=self.rdv_category_var,
-            values=["💼 Work", "🩺 Health", "📞 Call", "🏠 Personal", "🎉 Social", "📌 General"],
-            width=12, state="readonly"
+            values=["🎫 Ticket", "🚨 SLA Warning", "📞 Callback", "🔄 Follow-up", "🛠️ Maintenance", "💼 Work", "🩺 Health", "🏠 Personal", "📌 General"],
+            width=14, state="readonly"
         )
         combo_cat.grid(row=0, column=1, sticky="w", padx=4, pady=2)
 
@@ -427,9 +469,10 @@ class MainApp(tk.Tk):
                   relief="flat", cursor="hand2", padx=12, pady=4, command=self._save_settings).pack(anchor="e", pady=4)
 
     def _init_activity_tab(self, parent):
-        """Activity tab: live view of All Timers and All Rendez-vous with detail panel."""
+        """Activity tab: live view of All Timers and All Rendez-vous with detail panel and Completed History."""
         parent.columnconfigure(0, weight=1)
         parent.columnconfigure(1, weight=1)
+        parent.rowconfigure(0, weight=1)
         parent.rowconfigure(1, weight=1)
 
         # ── Timers column ──────────────────────────────────────────────────────
@@ -437,7 +480,7 @@ class MainApp(tk.Tk):
             parent, text=" ⏳ All Timers ", font=(FONT_FAMILY, 9, "bold"),
             bg=COLORS["bg_dark"], fg=COLORS["accent"], padx=6, pady=4
         )
-        timer_box.grid(row=0, column=0, rowspan=2, sticky="nsew", padx=(4, 2), pady=4)
+        timer_box.grid(row=0, column=0, sticky="nsew", padx=(4, 2), pady=(4, 2))
 
         # Counter badge
         self.lbl_timer_count = tk.Label(
@@ -457,7 +500,7 @@ class MainApp(tk.Tk):
             t_list_frame, bg=COLORS["surface"], fg=COLORS["text"],
             selectbackground=COLORS["accent"], borderwidth=0,
             font=(FONT_FAMILY, 8), yscrollcommand=t_scrollbar.set,
-            activestyle="none", cursor="hand2"
+            activestyle="none", cursor="hand2", height=5
         )
         self.activity_timer_lb.pack(fill="both", expand=True)
         t_scrollbar.config(command=self.activity_timer_lb.yview)
@@ -494,7 +537,7 @@ class MainApp(tk.Tk):
             parent, text=" 📅 All Rendez-vous ", font=(FONT_FAMILY, 9, "bold"),
             bg=COLORS["bg_dark"], fg=COLORS["accent"], padx=6, pady=4
         )
-        rdv_box.grid(row=0, column=1, rowspan=2, sticky="nsew", padx=(2, 4), pady=4)
+        rdv_box.grid(row=0, column=1, sticky="nsew", padx=(2, 4), pady=(4, 2))
 
         # Counter badge
         self.lbl_rdv_count = tk.Label(
@@ -514,7 +557,7 @@ class MainApp(tk.Tk):
             r_list_frame, bg=COLORS["surface"], fg=COLORS["text"],
             selectbackground=COLORS["accent"], borderwidth=0,
             font=(FONT_FAMILY, 8), yscrollcommand=r_scrollbar.set,
-            activestyle="none", cursor="hand2"
+            activestyle="none", cursor="hand2", height=5
         )
         self.activity_rdv_lb.pack(fill="both", expand=True)
         r_scrollbar.config(command=self.activity_rdv_lb.yview)
@@ -539,9 +582,59 @@ class MainApp(tk.Tk):
             command=self._activity_delete_rdv
         ).pack(side="left")
 
+        # ── Completed History Section ─────────────────────────────────────────
+        history_box = tk.LabelFrame(
+            parent, text=" 📜 Completed / Triggered History ", font=(FONT_FAMILY, 9, "bold"),
+            bg=COLORS["bg_dark"], fg=COLORS["text_muted"], padx=6, pady=4
+        )
+        history_box.grid(row=1, column=0, columnspan=2, sticky="nsew", padx=4, pady=(2, 4))
+
+        h_top = tk.Frame(history_box, bg=COLORS["bg_dark"])
+        h_top.pack(fill="x", pady=(0, 2))
+
+        self.lbl_history_count = tk.Label(
+            h_top, text="0 completed", font=(FONT_FAMILY, 8),
+            bg=COLORS["surface_light"], fg=COLORS["text_muted"], padx=6, pady=1
+        )
+        self.lbl_history_count.pack(side="left")
+
+        tk.Button(
+            h_top, text="🧹 Clear History", font=(FONT_FAMILY, 7),
+            bg=COLORS["surface_light"], fg=COLORS["text_muted"], activeforeground=COLORS["accent_danger"],
+            relief="flat", cursor="hand2", padx=6, pady=1, command=self._clear_history
+        ).pack(side="right")
+
+        h_body = tk.Frame(history_box, bg=COLORS["bg_dark"])
+        h_body.pack(fill="both", expand=True)
+
+        h_list_frame = tk.Frame(h_body, bg=COLORS["bg_dark"])
+        h_list_frame.pack(side="left", fill="both", expand=True, padx=(0, 4))
+
+        h_scrollbar = tk.Scrollbar(h_list_frame, orient="vertical", bg=COLORS["surface"])
+        h_scrollbar.pack(side="right", fill="y")
+
+        self.activity_history_lb = tk.Listbox(
+            h_list_frame, bg=COLORS["surface"], fg=COLORS["text"],
+            selectbackground=COLORS["accent"], borderwidth=0,
+            font=(FONT_FAMILY, 8), yscrollcommand=h_scrollbar.set,
+            activestyle="none", cursor="hand2", height=4
+        )
+        self.activity_history_lb.pack(fill="both", expand=True)
+        h_scrollbar.config(command=self.activity_history_lb.yview)
+        self.activity_history_lb.bind("<<ListboxSelect>>", self._on_activity_history_select)
+
+        self.history_detail = tk.Label(
+            h_body, text="Select an event to view completion details.",
+            font=(FONT_FAMILY, 8), bg=COLORS["surface"], fg=COLORS["text_muted"],
+            anchor="nw", justify="left", padx=8, pady=4, width=28, wraplength=220
+        )
+        self.history_detail.pack(side="right", fill="both")
+
         # Internal caches used by action callbacks (filled by _refresh_loop)
         self._activity_timer_items: list = []
         self._activity_rdv_items: list = []
+        self._history_items: list = []
+        self._load_history_list()
 
     # ── Activity Tab helpers ──────────────────────────────────────────────────
 
@@ -617,6 +710,93 @@ class MainApp(tk.Tk):
             it = self._activity_rdv_items[sel[0]]
             self.scheduler.remove_item(it.id)
             self.rdv_detail.config(text="Select an event to see details.", fg=COLORS["text_muted"])
+
+    def _load_history_list(self):
+        """Reload history items into listbox."""
+        if not hasattr(self, "activity_history_lb"):
+            return
+        self._history_items = Storage.load_history()
+        self.activity_history_lb.delete(0, tk.END)
+        for h in self._history_items:
+            cat = h.get("category", "")
+            icon = cat.split()[0] if cat and cat != "General" else "📌"
+            status = h.get("status", "Triggered")
+            time_part = h.get("completed_at", "")
+            self.activity_history_lb.insert(
+                tk.END,
+                f"{icon} {h.get('name', 'Event')} — [{status}] {time_part}"
+            )
+        cnt = len(self._history_items)
+        self.lbl_history_count.config(text=f"{cnt} logged" if cnt else "0 logged")
+
+    def _on_activity_history_select(self, _event=None):
+        sel = self.activity_history_lb.curselection()
+        if not sel or sel[0] >= len(self._history_items):
+            return
+        h = self._history_items[sel[0]]
+        lines = [
+            f"📌 {h.get('name', 'Event')}",
+            f"🏷 Type:     {h.get('kind', '').capitalize()}",
+            f"📁 Category: {h.get('category', 'General')}",
+            f"⚡ Status:   {h.get('status', 'Completed')}",
+            f"⏰ Time:     {h.get('completed_at', '')}",
+        ]
+        self.history_detail.config(text="\n".join(lines), fg=COLORS["text"])
+
+    def _clear_history(self):
+        if messagebox.askyesno("Clear History", "Are you sure you want to clear all completed history?"):
+            Storage.clear_history()
+            self._load_history_list()
+            self.history_detail.config(text="Select an event to view completion details.", fg=COLORS["text_muted"])
+
+    # ── Mini HUD Controller ───────────────────────────────────────────────────
+
+    def _toggle_hud(self):
+        if self.hud and self.hud.winfo_exists() and self.hud.state() == "normal":
+            self._save_hud_pos()
+            self.hud.withdraw()
+            self.hud_enabled = False
+            self.btn_hud_toggle.config(text="📌 Mini HUD: OFF", fg=COLORS["text_muted"])
+        else:
+            self._show_hud()
+
+    def _show_hud(self):
+        saved_x = self.settings.get("hud_x", 120)
+        saved_y = self.settings.get("hud_y", 80)
+        if self.hud is None or not self.hud.winfo_exists():
+            self.hud = FloatingMiniHUD(
+                master=self,
+                on_toggle_pause=self._toggle_active_timer_pause,
+                on_bring_main_to_front=self._bring_to_front,
+                on_close=self._on_hud_close,
+                initial_x=saved_x,
+                initial_y=saved_y
+            )
+        else:
+            self.hud.deiconify()
+            self.hud.lift()
+        self.hud_enabled = True
+        self.btn_hud_toggle.config(text="📌 Mini HUD: ON", fg=COLORS["accent"])
+
+    def _bring_to_front(self):
+        self.deiconify()
+        self.lift()
+        self.focus_force()
+
+    def _on_hud_close(self):
+        self._save_hud_pos()
+        self.hud_enabled = False
+        self.btn_hud_toggle.config(text="📌 Mini HUD: OFF", fg=COLORS["text_muted"])
+
+    def _save_hud_pos(self):
+        if self.hud and self.hud.winfo_exists():
+            try:
+                self.settings["hud_x"] = self.hud.winfo_x()
+                self.settings["hud_y"] = self.hud.winfo_y()
+                self.settings["hud_enabled"] = self.hud_enabled
+                Storage.save_settings(self.settings)
+            except Exception:
+                pass
 
     def _on_volume_change(self, val):
         self.lbl_volume.config(text=f"Master Alarm Volume: {val}%")
@@ -864,6 +1044,16 @@ class MainApp(tk.Tk):
         if hasattr(self, "tray") and self.tray:
             self.tray.update_tooltip(tooltip)
 
+        # Update Floating Mini HUD if active
+        if getattr(self, "hud", None) and self.hud.winfo_exists() and self.hud.state() == "normal":
+            hud_item = active_timer or nearest_item
+            if hud_item:
+                rem = hud_item.remaining_paused if hud_item.is_paused else max(0.0, hud_item.target_time - now)
+                is_sla = "SLA" in hud_item.name or getattr(hud_item, "category", "") in ("🚨 SLA Warning", "🎫 Ticket")
+                self.hud.update_status(hud_item.name, rem, is_paused=hud_item.is_paused, is_sla=is_sla)
+            else:
+                self.hud.set_idle()
+
         # Update Activity Tab (only if it has been built)
         if hasattr(self, "activity_timer_lb"):
             self._refresh_activity_tab(now)
@@ -960,16 +1150,48 @@ class MainApp(tk.Tk):
         self.deiconify()
         self.lift()
 
+        # Log completion trigger to history
+        now_str = datetime.datetime.now().strftime("%b %d, %H:%M:%S")
+        entry = {
+            "name": item.name,
+            "kind": item.kind,
+            "category": getattr(item, "category", "General"),
+            "completed_at": now_str,
+            "status": "Triggered"
+        }
+        Storage.add_history_entry(entry)
+        self._load_history_list()
+
         def dismiss():
             self.sound_player.stop_alarm()
+            # Update history entry to completed
+            dismiss_entry = {
+                "name": item.name,
+                "kind": item.kind,
+                "category": getattr(item, "category", "General"),
+                "completed_at": datetime.datetime.now().strftime("%b %d, %H:%M:%S"),
+                "status": "Completed / Dismissed"
+            }
+            Storage.add_history_entry(dismiss_entry)
+            self._load_history_list()
 
         def snooze(minutes: int):
             self.sound_player.stop_alarm()
+            snooze_entry = {
+                "name": f"[Snooze {minutes}m] {item.name}",
+                "kind": item.kind,
+                "category": getattr(item, "category", "General"),
+                "completed_at": datetime.datetime.now().strftime("%b %d, %H:%M:%S"),
+                "status": f"Snoozed {minutes}m"
+            }
+            Storage.add_history_entry(snooze_entry)
+            self._load_history_list()
             self.scheduler.add_item(
                 kind=item.kind,
                 name=f"[Snooze] {item.name}",
                 seconds_from_now=minutes * 60,
-                original_duration=minutes * 60
+                original_duration=minutes * 60,
+                category=getattr(item, "category", "General")
             )
 
         AlarmDialog(
@@ -992,6 +1214,9 @@ class MainApp(tk.Tk):
             self.lift()
 
     def quit_app(self):
+        self._save_hud_pos()
+        if self.hud and self.hud.winfo_exists():
+            self.hud.destroy()
         self.tray.stop()
         self.destroy()
         sys.exit(0)

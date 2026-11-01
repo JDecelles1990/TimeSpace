@@ -38,13 +38,32 @@ Press **Enter** or click **Create ⚡**.
 
 ## ⏳ Timers & Quick Presets
 - **Quick Presets**: Single click on **30 Minutes**, **1 Hour**, or **2 Hours**.
+- **🎫 IT Support & SLA Presets**: One-click timers tailored for helpdesk workflows:
+  - **`⚡ 15m SLA`**: P1 Critical Response countdown (`🚨 SLA Warning`).
+  - **`🚨 30m SLA`**: High priority ticket action window (`🚨 SLA Warning`).
+  - **`📞 45m Callback`**: Scheduled customer callback alert (`📞 Callback`).
+  - **`🔄 2h Follow-up`**: Ticket status check & follow-up reminder (`🔄 Follow-up`).
+  - **`🛠️ 4h Maint`**: System maintenance window countdown (`🛠️ Maintenance`).
 - **Custom Timer**: Enter task name, hours, minutes, seconds, check **Repeat automatically** if desired, and click **Start Timer**.
+
+---
+
+## 📌 Floating Mini HUD (Compact Multi-Monitor Widget)
+Designed for IT support desks, NOC monitors, and multi-display setups:
+- **Always-on-Top & Borderless**: Minimalist translucent HUD pill (280x42px) floats unobtrusively over ticketing systems (Jira, ServiceNow, Zendesk).
+- **Draggable Anywhere**: Click and drag from any monitor; automatically remembers its position on screen for future launches.
+- **Urgency Color Coding**:
+  - `Indigo` (>5m): Normal operations.
+  - `Amber` (<5m): Approaching SLA or deadline.
+  - `Crimson Red` (<1m or overdue): Critical SLA breach alert with `🚨` warning icon.
+- **Embedded Controls**: Direct `⏯️` quick pause/resume button and `✕` close button. Double-click the HUD to immediately bring the full application to front.
+- **Toggle Options**: Toggle via the header button (`📌 Mini HUD: ON/OFF`) or from the System Tray right-click menu.
 
 ---
 
 ## 📅 Rendez-vous Tab & Interactive Calendar
 - **Interactive Dark Calendar Grid**:
-  - Browse months using `◀` and `▶`.
+  - Browse months using `◀` and `▶`. Week starts on **Sunday** and ends on **Saturday**.
   - Click any day cell to select that date.
   - Days with scheduled events feature a glowing dot (`•`).
   - **Day Inspector**: Underneath the calendar, view appointments scheduled for the selected day.
@@ -58,14 +77,14 @@ Press **Enter** or click **Create ⚡**.
 - **Early Warning Lead-Time**:
   - Configure early reminders: `At time of event (0m)`, `5m before`, `10m before`, or `15m before`.
 - **Category Badges**:
-  - Tag events with `💼 Work`, `🩺 Health`, `📞 Call`, `🏠 Personal`, `🎉 Social`, or `📌 General`.
+  - Tag events with `🎫 Ticket`, `🚨 SLA Warning`, `📞 Callback`, `🔄 Follow-up`, `🛠️ Maintenance`, `💼 Work`, `🩺 Health`, `🏠 Personal`, or `📌 General`.
 - **Repeating Rules**: Pick **None**, **Daily**, **Weekly**, or **Monthly**.
 - **Export / Import .ics**: Sync appointments with Microsoft Outlook, Google Calendar, or Apple Calendar.
 
 ---
 
 ## 📋 Activity Tab
-A live dashboard showing all scheduled items split by type, updated every second:
+A live dashboard showing all active and completed items, updated in real time:
 - **⏳ All Timers** (left column):
   - Live countdown (`HH:MM:SS remaining`) for every active timer.
   - `⏸️` badge for paused timers, `🔁` badge for repeating timers.
@@ -74,10 +93,14 @@ A live dashboard showing all scheduled items split by type, updated every second
   - **🗑️ Delete**: Remove the selected timer permanently.
 - **📅 All Rendez-vous** (right column):
   - Live countdown for every scheduled appointment.
-  - Category icon (`💼 🩺 📞 🏠 🎉`) and `🔁` repeat badge shown inline.
+  - Category icon (`🎫 🚨 📞 🔄 🛠️ 💼 🩺 🏠`) and `🔁` repeat badge shown inline.
   - **Detail card**: Click any event to see name, remaining time, date/time, repeat rule, category, and early-alert lead time.
   - **🗑️ Delete**: Cancel the selected appointment.
-- Both columns show a **counter badge** (e.g. `3 active`, `2 scheduled`) that dims to `None` when the list is empty.
+- **📜 Completed / Triggered History** (bottom section):
+  - In-app searchable audit log of finished and triggered events.
+  - Logs completion timestamp, final status (`Triggered`, `Completed / Dismissed`, `Snoozed 5m/15m`).
+  - Detail inspector displaying event category, duration, and completion details.
+  - **`🧹 Clear History`** button to flush past logs on demand.
 
 ---
 
@@ -100,6 +123,7 @@ A live dashboard showing all scheduled items split by type, updated every second
 - **Close Button `[X]`**: Hides to the tray; timers continue running uninterrupted.
 - **Tray Quick Actions (Right-Click Context Menu)**:
   - `⏯️ Pause / Resume Active Timer`
+  - `📌 Toggle Mini HUD`
   - `Show / Hide (Ctrl+F7)`
   - `Exit App`
 - **Dynamic Tooltip**: Hovering your mouse over the clock icon shows:
