@@ -8,13 +8,17 @@
 ## [v3.6] — `5. Go ⏱️` Enhancements: Color Console, Scratchpad Bridge, HTTP/DNS Probes, Presets & Binary Builder (2026-11-01)
 - **Color-Coded Live Output Console (`src/go_tab.py`)**:
   - Added `GoConsoleHighlighter(QSyntaxHighlighter)` highlighting `[PASS]`/`OPEN`/`✔`/`200 OK` in emerald green, `[FAIL]`/`[ERROR]`/`[STDERR]`/`UNREACHABLE`/`✖` in crimson red, `CLOSED/FILTERED`/`[WARN]`/`[STOPPED]`/`ELEVATED` in amber, and `═══` action headers in sky cyan using `COLORS` tokens.
-- **1-Click Clipboard Copy & `+Scratchpad` Integration (`src/go_tab.py`, `src/gui.py`)**:
-  - Added **`📋 Copy`** (`copy_console_output()`) and **`📝 +Scratchpad`** (`send_console_to_scratchpad()`, emitting `sendToScratchpad = Signal(str)`) to the console toolbar, wired to `TimerRendezVousWidget._append_to_scratchpad()` so diagnostic logs append cleanly with a timestamped header into Tab 4 (`4. Scratchpad 📝`) and auto-save immediately.
+- **1-Click Clipboard Copy, `+Scratchpad` Integration & Diagnostic Report Exporter (`src/go_tab.py`, `src/storage.py`, `src/gui.py`, `go_engine/main.go`)**:
+  - Added **`📋 Copy`** (`copy_console_output()`), **`📝 +Scratchpad`** (`send_console_to_scratchpad()`, emitting `sendToScratchpad = Signal(str)` wired to `TimerRendezVousWidget._append_to_scratchpad()`), and **`💾 Export`** (`export_console_report()`, delegating to `Storage.export_diagnostic_report()` to save `.md`, `.txt`, or `.json` incident reports).
+  - Automatically hidden the bottom **Active Reminders Queue** on **`4. Scratchpad 📝`** (as well as **`5. Go ⏱️`**), giving the Scratchpad editor full vertical window height for writing notes.
 - **Expanded Diagnostic Suite to 8 Actions (`src/config.py`, `src/go_tab.py`, `go_engine/main.go`, `go_engine/diag_common.go`)**:
   - Added **`🌍 HTTP/S Probe`** (`--action=http-check`: HTTP/HTTPS status code, protocol, latency, redirect URL, and `Server` header) and **`🧭 DNS Lookup`** (`--action=dns-lookup`: `A`, `AAAA`, `CNAME`, `MX`, `NS`, and `TXT` records) in a `2×4` action grid across both pure Go (`go_engine/`) and the built-in Python fallback engine.
-  - Upgraded the `--interactive` external REPL (`go_engine/main.go`, `go_engine/fixes_*.go`, and `src/go_tab.py`) with:
-    - Options `[5] HTTP/HTTPS Status & Latency Probe`, `[6] DNS Records Inspector`, and `[7] Automated Network Triage Playbook`.
+  - Upgraded the `--interactive` external REPL (`go_engine/main.go`, `go_engine/fixes_*.go`, and `src/go_tab.py`) into **two dedicated privilege-specific Interactive Go CLIs**:
+    - **Standard User Diagnostic CLI (`--cli-mode=user`, `TimeSpace-User> `)**: 8 non-elevated diagnostic options (`[1] Ping`, `[2] Port Scan`, `[3] TLS Cert`, `[4] HTTP/S Probe`, `[5] DNS Lookup`, `[6] IP Config Summary`, `[7] Socket & Uptime Summary`, `[8] Standard User Playbook`).
+    - **Elevated Admin Remediation & Deep Audit CLI (`--cli-mode=admin`, `TimeSpace-Admin⚡> `)**: 9 Administrator / `sudo` OS remediation & deep audit commands (`[1] Flush DNS`, `[2] Clear ARP & NetBIOS Cache`, `[3] Restart DNS Client Service`, `[4] Reset Winsock Catalog`, `[5] Reset TCP/IP Stack`, `[6] Elevated Port & Process Owner Audit`, `[7] OS Firewall Profiles Audit`, `[8] Kernel IPv4 Routing Table Audit`, `[9] Automated Admin Repair & Audit Playbook`).
     - **Multi-number & range selection** (`1,3,4`, `1-4, 6`) with deduplicated sequential execution and `[i/total]` step progress.
+    - **`copy` command** (plus `cp` alias) to copy the last diagnostic batch output to the system clipboard (`clip.exe` UTF-16LE on Windows, `pbcopy` on macOS, `wl-copy`/`xclip`/`xsel` on Linux).
+    - **`save [fmt]` command** (plus `export` alias) to export the last diagnostic output directly to `C:\Temp\TimeSpace_Diag_<target>_<timestamp>.<md|txt|json>` (auto-creating `C:\Temp` if missing).
     - **`clr` command** (plus `clear`/`cls` aliases) to clear the terminal viewport and scrollback buffer.
     - **TimeSpace Purple (`#6366f1`)** TrueColor ANSI main menu styling with native Windows Virtual Terminal Processing (`ENABLE_VIRTUAL_TERMINAL_PROCESSING`) and UTF-8 console codepage setup.
 - **Quick Target Presets & 1-Click Binary Builder (`src/config.py`, `src/__init__.py`, `src/go_tab.py`)**:

@@ -51,7 +51,7 @@
 - Click any item to inspect its fire timestamp, category, lead-time, repeat rule, note, and link; act immediately with **`⏯ Pause/Resume`**, **`🗑️ Delete`**, or the contextual **`🔗 Open Link`** button (shown whenever the selected item has a link).
 
 ### Tab 4 — `4. Scratchpad 📝` (Rich-Text Time Notes & Clickable Links)
-- Monospace rich-text notepad (`Consolas`) for quick time notes, call logs, client references, or web links, auto-saved continuously (`500ms` debounce) with full formatting persistence (`data/scratchpad.json`).
+- Monospace rich-text notepad (`Consolas`) for quick time notes, call logs, client references, or web links, auto-saved continuously (`500ms` debounce) with full formatting persistence (`data/scratchpad.json`). Automatically hides the bottom `Active Reminders Queue` while active, giving the editor full vertical room.
 - **`𝐁 Bold (Ctrl+B)`**: Toggles bold formatting on highlighted text (or for upcoming typed text when nothing is selected).
 - **`🎨 Color`**: Opens a quick color palette (`Default White`, `Indigo Accent`, `Sky Cyan`, `Emerald Green`, `Amber Gold`, `Coral Orange`, `Crimson Red`, `Violet Purple`) plus **`🎨 Custom Color...`** to apply any color to highlighted text.
 - **Detectable & Clickable Web Links**: Any web link (`https://...`, `http://...`, `www....`, or bare domains like `github.com/...`) is automatically underlined and highlighted in real time. Hovering over a link switches the cursor to a pointing hand (`👆`), and left-clicking it opens the URL directly in your default web browser (while clicking and dragging still lets you highlight/select the link text normally).
@@ -75,14 +75,18 @@
   6. **`🧹 Flush DNS`** (`--action=flush-dns`): Executes OS DNS cache flush (`ipconfig /flushdns` on Windows, `resolvectl flush-caches` on Linux, `dscacheutil -flushcache` on macOS).
   7. **`🖧 Net Triage`** (`--action=net-status`): Displays active interface IP/gateway/DNS configuration.
   8. **`📊 Sys & Sockets`** (`--action=sys-info`): Summarizes active network sockets and system statistics.
-- **External Interactive Go CLI & Privilege Elevation (`⚡ Run as Admin / sudo` + `🚀 Launch Interactive Go CLI`)**:
-  - Click **`🚀 Launch Interactive Go CLI (External Terminal)`** to spawn a standalone terminal session featuring a **TimeSpace Purple (`#6366f1`)** main menu (`[1]`–`[7]`, including **`[7] Automated Network Triage Playbook`**) with `[ADMIN / ROOT]` vs `[STANDARD USER]` token detection.
-  - **Multi-Select, Ranges & Screen Clear**: Enter multiple option numbers (`1,3,4`), number ranges (`1-4, 6`), `target <host>` to switch targets dynamically, `clr` (or `clear`/`cls`) to clear the terminal screen, or `exit` to close.
-  - Check **`⚡ Run as Admin / sudo (Elevated Fixes)`** before launching to trigger native OS privilege elevation (Win32 `ShellExecuteW("runas")` Windows UAC prompt with UTF-16LE `-EncodedCommand`, `sudo` on Linux, or `osascript` on macOS).
-- **Color-Coded Console, Clipboard & Scratchpad Bridge**:
+- **Two Specialized External Interactive Go CLIs (Standard User vs Elevated Admin)**:
+  - **1. Standard User Diagnostic CLI (`--cli-mode=user`, Prompt: `TimeSpace-User> `)**:
+    - Launched when **`⚡ Run as Admin / sudo`** is unchecked (**`🚀 Launch Standard Go CLI (User Diagnostics)`**).
+    - Features 8 non-elevated diagnostic options in a **TimeSpace Purple (`#6366f1`)** menu: `[1] Ping & TCP Reachability`, `[2] Concurrent Port Scan`, `[3] TLS Certificate Inspector`, `[4] HTTP/HTTPS Status & Latency Probe`, `[5] DNS Records Inspector`, `[6] Network Interface & IP Config Summary`, `[7] Active Socket & System Uptime Summary`, and `[8] Automated Standard User Diagnostic Playbook (Runs 1–7)`.
+  - **2. Elevated Admin Remediation & Deep Audit CLI (`--cli-mode=admin`, Prompt: `TimeSpace-Admin⚡> `)**:
+    - Launched when **`⚡ Run as Admin / sudo`** is checked (**`⚡ Launch Admin Go CLI (Elevated OS Fixes & Audits)`**), triggering native OS privilege elevation (Win32 `ShellExecuteW("runas")` Windows UAC prompt with UTF-16LE `-EncodedCommand`, `sudo` on Linux, or `osascript` on macOS).
+    - Features 9 Administrator / root remediation and deep audit actions: `[1] Flush OS DNS Resolver Cache`, `[2] Clear ARP & NetBIOS Name Cache`, `[3] Restart OS DNS Client Service`, `[4] Reset Winsock Catalog`, `[5] Reset TCP/IP Stack`, `[6] Elevated Port & Process Owner Audit (netstat -abno / ss -tulnp)`, `[7] OS Firewall Profiles & Policy Audit`, `[8] Kernel IPv4 Routing Table & Gateway Audit`, and `[9] Automated Admin Repair & Audit Playbook`.
+  - **Shared REPL Commands (`Multi-Select`, `Ranges`, `copy`, `save`, `clr`, `target`, `exit`)**: Both CLIs support multiple numbers (`1,3,4`), number ranges (`1-4, 6`), `target <host>`, `copy` (or `cp`) to clipboard, `save [md|txt|json]` (or `export`) into `C:\Temp` (created automatically if missing), `clr` (or `clear`/`cls`), and `exit`.
+- **Color-Coded Console, Clipboard, Scratchpad Bridge & Report Exporter**:
   - Automatically hides the bottom `Active Reminders Queue` while on **`5. Go ⏱️`** so the console expands to full vertical height.
   - Real-time syntax highlighting (`GoConsoleHighlighter`) colors `[PASS]` / `OPEN` / `200 OK` in emerald green, `[FAIL]` / `[ERROR]` / `UNREACHABLE` in crimson red, `CLOSED/FILTERED` / `[WARN]` / `ELEVATED` in amber, and action banners in sky cyan, while completed runs log automatically into **`6. History 📜`**.
-  - Click **`📋 Copy`** to copy console output to the clipboard, or click **`📝 +Scratchpad`** to append a timestamped diagnostic report directly into **`4. Scratchpad 📝`** for ticket/call documentation.
+  - Click **`📋 Copy`** to copy console output to the clipboard, **`📝 +Scratchpad`** to append a timestamped diagnostic report directly into **`4. Scratchpad 📝`**, or **`💾 Export`** to save a formatted `.md`, `.txt`, or `.json` incident report.
 
 ### Tab 6 — `6. History 📜` (Completed & Triggered Log)
 - Dedicated full-height audit log recording every **`Triggered`**, **`Dismissed`**, **`Opened Link`**, **`Snoozed`**, and **`Diag PASS / FAIL`** entry (up to the latest 100 entries).
@@ -100,7 +104,7 @@
 
 ## 3. Persistent Queue, Notifications, HUD & Shortcuts
 
-- **Active Reminders Queue (Bottom Panel)**: Always visible beneath Tabs 1–4 and 6–7 (and automatically hidden on **`5. Go ⏱️`** to maximize console height), displaying 7–9+ visible rows. Items highlight **Amber** under 5 minutes and **Crimson Red** under 1 minute, and display `🔗` / `📝` indicators (with hover tooltips) when links or notes are attached.
+- **Active Reminders Queue (Bottom Panel)**: Always visible beneath Tabs 1–3 and 6–7 (and automatically hidden on **`4. Scratchpad 📝`** and **`5. Go ⏱️`** to maximize text editing and console height), displaying 7–9+ visible rows. Items highlight **Amber** under 5 minutes and **Crimson Red** under 1 minute, and display `🔗` / `📝` indicators (with hover tooltips) when links or notes are attached.
 - **Bottom-Right Alarm Popup**: Triggers as a compact frameless card above the Windows system tray (stacking vertically if multiple alarms fire) alongside a Windows Action Center toast—without forcing the main window open over your work. Displays any attached note and lets you click **`🔗 Open Link`** (which opens the URL/file, stops alarm audio, logs `Opened Link`, and dismisses the popup), **`✓ Dismiss`**, or **`💤 Snooze`** (`5m`/`10m`/`15m`/`30m`, preserving notes & links).
 - **Missed & Sleep-Wake Alerts**: Automatically notifies you on startup or PC wake-up if reminders elapsed while the app was closed or the PC was asleep.
 - **📌 Floating Mini HUD**: Draggable always-on-top desktop pill showing the nearest countdown with urgency border colors and quick pause (`⏯`). Double-click the HUD to bring the main window forward.

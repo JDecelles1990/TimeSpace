@@ -383,9 +383,9 @@ class TimerRendezVousWidget(QWidget):
         self._init_activity_tab(tab_activity)
         self.tabs.addTab(tab_activity, "3. Activity 📋")
 
-        tab_scratchpad = QWidget()
-        self._init_scratchpad_tab(tab_scratchpad)
-        self.tabs.addTab(tab_scratchpad, "4. Scratchpad 📝")
+        self.tab_scratchpad = QWidget()
+        self._init_scratchpad_tab(self.tab_scratchpad)
+        self.tabs.addTab(self.tab_scratchpad, "4. Scratchpad 📝")
 
         self.go_tab = GoTroubleshootingTab(self)
         self.go_tab.diagnostic_completed.connect(self._on_go_diagnostic_completed)
@@ -404,10 +404,11 @@ class TimerRendezVousWidget(QWidget):
         parent_layout.addWidget(self.tabs, 2)
 
     def _on_main_tab_changed(self, _index: int) -> None:
-        """Hide the bottom Active Reminders Queue only on '5. Go ⏱️' so its console expands to full height."""
+        """Hide the bottom Active Reminders Queue on '4. Scratchpad 📝' and '5. Go ⏱️' for full vertical expansion."""
         if hasattr(self, "active_queue_group"):
-            is_go_tab = self.tabs.currentWidget() is self.go_tab
-            self.active_queue_group.setVisible(not is_go_tab)
+            curr = self.tabs.currentWidget()
+            hide_queue = (curr is self.go_tab) or (hasattr(self, "tab_scratchpad") and curr is self.tab_scratchpad)
+            self.active_queue_group.setVisible(not hide_queue)
 
     # ── Tab 1: Professional Timer ────────────────────────────────────────────
 
@@ -937,7 +938,7 @@ class TimerRendezVousWidget(QWidget):
         layout.addWidget(s_group)
         layout.addStretch()
 
-    # ── Bottom Active Queue (Visible Across Tabs 1–4, 6–7; Hidden on 5. Go) ──
+    # ── Bottom Active Queue (Visible Across Tabs 1–3, 6–7; Hidden on 4. Scratchpad & 5. Go) ──
 
     def _build_active_queue(self, parent_layout: QVBoxLayout) -> None:
         self.active_queue_group = QGroupBox("Active Reminders Queue")

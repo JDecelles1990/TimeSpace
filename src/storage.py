@@ -1,10 +1,15 @@
-"""Persistence layer for AppConfig, reminders, history, and scratchpad using JSON."""
+"""Persistence layer for AppConfig, reminders, history, scratchpad, and diagnostic reports."""
+import datetime
 import json
 import os
-from typing import Dict, Any, List, Union
+import platform
+import re
+import sys
+from typing import Dict, Any, List, Optional, Union
 from src.config import AppConfig, HistoryEntry, ScratchpadState
 
 DATA_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data")
+REPORTS_DIR = r"C:\Temp" if sys.platform == "win32" else "/tmp"
 SETTINGS_FILE = os.path.join(DATA_DIR, "settings.json")
 REMINDERS_FILE = os.path.join(DATA_DIR, "reminders.json")
 HISTORY_FILE = os.path.join(DATA_DIR, "history.json")
@@ -141,3 +146,80 @@ class Storage:
                 json.dump(payload, f, indent=2)
         except Exception:
             pass
+
+    # ── Diagnostic Incident Reports (.md / .txt / .json) ─────────────────────
+
+    @classmethod
+    def default_report_path(cls, target: str, fmt: str = "md") -> str:
+        """Build a default timestamped diagnostic report filepath inside C:\\Temp (created if missing)."""
+        os.makedirs(REPORTS_DIR, exist_ok=True)
+        ext = fmt.lower().lstrip(".")
+        if ext not in ("md", "txt", "json"):
+            ext = "md"
+        safe_tgt = re.sub(r"[^A-Za-z0-9._-]+", "_", target.strip() or "1.1.1.1").strip("_") or "target"
+        stamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+        return os.path.join(REPORTS_DIR, f"TimeSpace_Diag_{safe_tgt}_{stamp}.{ext}")
+
+    @classmethod
+    def export_diagnostic_report(
+        cls,
+        output_text: str,
+        target: str,
+        filepath: Optional[str] = None,
+        fmt: str = "md",
+    ) -> str:
+        """Format and save a diagnostic report (.md, .txt, or .json) in C:\\Temp and return its absolute filepath."""
+        os.makedirs(REPORTS_DIR, exist_ok=True)
+        clean_out = output_text.strip()
+        clean_tgt = target.strip() or "1.1.1.1"
+        if filepath and filepath.strip():
+            raw_dest = filepath.strip()
+            dest = raw_dest if os.path.isabs(raw_dest) or os.path.dirname(raw_dest) else os.path.join(REPORTS_DIR, raw_dest)
+        else:
+            dest = cls.default_report_path(clean_tgt, fmt)
+        parent = os.path.dirname(os.path.abspath(dest))
+        if parent:
+            os.makedirs(parent, exist_ok=True)
+
+        ext = os.path.splitext(dest)[1].lower().lstrip(".") or fmt.lower().lstrip(".")
+        now_local = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        now_utc = datetime.datetime.now(datetime.timezone.utc).isoformat()
+        goos = "windows" if sys.platform == "win32" else ("darwin" if sys.platform == "darwin" else "linux")
+        arch = platform.machine().lower() or "amd64"
+
+        if ext == "json":
+            payload = {
+                "report": "TimeSpace Diagnostic Report",
+                "timestamp": now_utc,
+                "local_time": now_local,
+                "os": goos,
+                "arch": arch,
+                "target": clean_tgt,
+                "output": clean_out,
+            }
+            body = json.dumps(payload, indent=2, ensure_ascii=False) + "\n"
+        elif ext == "txt":
+            body = (
+                "===================================================================\n"
+                "  TimeSpace Diagnostic Incident Report\n"
+                f"  Generated : {now_local}\n"
+                f"  Target    : {clean_tgt}\n"
+                f"  Platform  : {goos}/{arch}\n"
+                "===================================================================\n\n"
+                f"{clean_out}\n"
+            )
+        else:
+            body = (
+                "# TimeSpace Diagnostic Incident Report\n\n"
+                f"- **Generated**: `{now_local}`\n"
+                f"- **Target**: `{clean_tgt}`\n"
+                f"- **Platform**: `{goos}/{arch}`\n\n"
+                "## Console Output\n\n"
+                "```text\n"
+                f"{clean_out}\n"
+                "```\n"
+            )
+
+        with open(dest, "w", encoding="utf-8") as f:
+            f.write(body)
+        return os.path.abspath(dest)

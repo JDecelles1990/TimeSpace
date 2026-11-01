@@ -43,6 +43,20 @@ func runOSAction(action string, target string) (string, error) {
 	switch action {
 	case "flush-dns":
 		cmd = exec.CommandContext(ctx, "ipconfig", "/flushdns")
+	case "arp-clear":
+		cmd = exec.CommandContext(ctx, "cmd", "/c", "arp -d * & nbtstat -R")
+	case "restart-dns-svc":
+		cmd = exec.CommandContext(ctx, "powershell", "-NoProfile", "-Command", "Restart-Service -Name Dnscache -Force -PassThru | Format-Table Name,Status,DisplayName -AutoSize")
+	case "winsock-reset":
+		cmd = exec.CommandContext(ctx, "netsh", "winsock", "reset")
+	case "tcp-reset":
+		cmd = exec.CommandContext(ctx, "netsh", "int", "ip", "reset")
+	case "admin-sockets":
+		cmd = exec.CommandContext(ctx, "netstat", "-abno")
+	case "firewall-audit":
+		cmd = exec.CommandContext(ctx, "netsh", "advfirewall", "show", "allprofiles")
+	case "route-table":
+		cmd = exec.CommandContext(ctx, "route", "print", "-4")
 	case "net-status", "net-reset":
 		cmd = exec.CommandContext(ctx, "netsh", "interface", "ip", "show", "config")
 	case "sys-info", "sys-health":

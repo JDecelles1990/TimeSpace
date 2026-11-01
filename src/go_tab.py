@@ -44,11 +44,13 @@ from PySide6.QtWidgets import (
     QPushButton,
     QComboBox,
     QCheckBox,
+    QFileDialog,
     QPlainTextEdit,
     QProgressBar,
 )
 
 from src.config import COLORS, GO_DIAG_ACTIONS, GO_TARGET_PRESETS
+from src.storage import Storage
 
 
 class GoConsoleHighlighter(QSyntaxHighlighter):
@@ -179,17 +181,18 @@ class GoTroubleshootingTab(QWidget):
         cli_launcher_layout = QHBoxLayout()
         cli_launcher_layout.setSpacing(8)
 
-        self.elevate_checkbox = QCheckBox("⚡ Run as Admin / sudo (Elevated Fixes)")
+        self.elevate_checkbox = QCheckBox("⚡ Run as Admin / sudo (Elevated Admin CLI)")
         self.elevate_checkbox.setCursor(Qt.CursorShape.PointingHandCursor)
         self.elevate_checkbox.setStyleSheet(
             f"QCheckBox {{ font-weight: bold; color: {COLORS['accent_warning']}; padding: 2px 4px; }}"
         )
+        self.elevate_checkbox.toggled.connect(self._on_elevate_toggled)
 
-        self.launch_cli_btn = QPushButton("🚀 Launch Interactive Go CLI (External Terminal)")
+        self.launch_cli_btn = QPushButton("🚀 Launch Standard Go CLI (User Diagnostics)")
         self.launch_cli_btn.setObjectName("primaryBtn")
         self.launch_cli_btn.setMinimumHeight(29)
         self.launch_cli_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.launch_cli_btn.clicked.connect(self.launch_interactive_go_cli)
+        self.launch_cli_btn.clicked.connect(lambda _c=False: self.launch_interactive_go_cli())
 
         cli_launcher_layout.addWidget(self.elevate_checkbox)
         cli_launcher_layout.addWidget(self.launch_cli_btn, 1)
@@ -229,6 +232,13 @@ class GoTroubleshootingTab(QWidget):
         self.btn_send_sp.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_send_sp.clicked.connect(self.send_console_to_scratchpad)
         ctrl_row.addWidget(self.btn_send_sp)
+
+        self.btn_export_report = QPushButton("💾 Export")
+        self.btn_export_report.setFixedHeight(23)
+        self.btn_export_report.setToolTip("Export diagnostic output to a .md, .txt, or .json incident report")
+        self.btn_export_report.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_export_report.clicked.connect(lambda _c=False: self.export_console_report())
+        ctrl_row.addWidget(self.btn_export_report)
 
         self.btn_stop = QPushButton("⏹ Stop")
         self.btn_stop.setObjectName("dangerBtn")
@@ -286,6 +296,38 @@ class GoTroubleshootingTab(QWidget):
         self.sendToScratchpad.emit(text)
         self.lbl_run_state.setText("📝 Sent to Scratchpad")
         self.lbl_run_state.setStyleSheet(f"color: {COLORS['accent_link']}; font-size: 11px; font-weight: bold;")
+
+    def export_console_report(self, filepath: Optional[str] = None) -> Optional[str]:
+        text = self.console.toPlainText().strip()
+        if not text:
+            self.lbl_run_state.setText("Nothing to export")
+            self.lbl_run_state.setStyleSheet(f"color: {COLORS['accent_warning']}; font-size: 11px; font-weight: bold;")
+            return None
+
+        target = self.entry_target.text().strip() or "1.1.1.1"
+        chosen_path = filepath
+        if not chosen_path:
+            default_path = Storage.default_report_path(target, "md")
+            chosen_path, _ = QFileDialog.getSaveFileName(
+                self,
+                "Export Diagnostic Incident Report",
+                default_path,
+                "Markdown Report (*.md);;Plain Text Report (*.txt);;JSON Diagnostic Bundle (*.json)",
+            )
+            if not chosen_path:
+                return None
+
+        try:
+            saved_path = Storage.export_diagnostic_report(text, target, filepath=chosen_path)
+            fname = Path(saved_path).name
+            self.lbl_run_state.setText(f"💾 Saved {fname}")
+            self.lbl_run_state.setStyleSheet(f"color: {COLORS['accent_success']}; font-size: 11px; font-weight: bold;")
+            return saved_path
+        except Exception as exc:
+            self._append_line(f"[ERROR] Failed to export diagnostic report: {exc}")
+            self.lbl_run_state.setText("Export failed")
+            self.lbl_run_state.setStyleSheet(f"color: {COLORS['accent_danger']}; font-size: 11px; font-weight: bold;")
+            return None
 
     def build_go_binaries(self) -> None:
         if self._process is not None and self._process.state() != QProcess.ProcessState.NotRunning:
@@ -346,26 +388,33 @@ class GoTroubleshootingTab(QWidget):
             return "Go CLI detected on PATH"
         return "Fallback ready"
 
-    # ── External Interactive Go CLI Launcher (Admin / sudo + REPL) ───────────
+    # ── External Interactive Go CLI Launcher (Standard User vs Elevated Admin) ──
 
-    def launch_interactive_go_cli(self) -> None:
+    def _on_elevate_toggled(self, checked: bool) -> None:
+        if checked:
+            self.launch_cli_btn.setText("⚡ Launch Admin Go CLI (Elevated OS Fixes & Audits)")
+        else:
+            self.launch_cli_btn.setText("🚀 Launch Standard Go CLI (User Diagnostics)")
+
+    def launch_interactive_go_cli(self, elevate_override: Optional[bool] = None) -> None:
         target = self.entry_target.text().strip() or "1.1.1.1"
-        elevate = self.elevate_checkbox.isChecked()
+        elevate = self.elevate_checkbox.isChecked() if elevate_override is None else bool(elevate_override)
+        cli_mode = "admin" if elevate else "user"
         binary_path = self._resolve_binary_path()
 
         if binary_path.exists():
-            cli_cmd = f'"{binary_path}" --interactive --target={target}'
+            cli_cmd = f'"{binary_path}" --interactive --cli-mode={cli_mode} --target={target}'
             work_dir = str(binary_path.parent)
         elif shutil.which("go") and self._go_engine_dir.exists():
-            cli_cmd = f"go run . --interactive --target={target}"
+            cli_cmd = f"go run . --interactive --cli-mode={cli_mode} --target={target}"
             work_dir = str(self._go_engine_dir)
         else:
             script_path = Path(__file__).resolve()
-            cli_cmd = f'"{sys.executable}" "{script_path}" --fallback-cli --interactive --target={target}'
+            cli_cmd = f'"{sys.executable}" "{script_path}" --fallback-cli --interactive --cli-mode={cli_mode} --target={target}'
             work_dir = str(self._repo_root)
 
-        mode_str = "ELEVATED (Admin/sudo)" if elevate else "STANDARD USER"
-        self._append_line(f"🚀 [EXEC] Spawning external Go CLI [{mode_str}] for target: {target}")
+        mode_str = "ELEVATED ADMIN CLI" if elevate else "STANDARD USER CLI"
+        self._append_line(f"🚀 [EXEC] Spawning external {mode_str} for target: {target}")
         started = False
 
         if sys.platform.startswith("win"):
@@ -788,6 +837,18 @@ def _fallback_os_action(action: str) -> Tuple[str, bool]:
     if sys.platform == "win32":
         cmd_map = {
             "flush-dns": ["ipconfig", "/flushdns"],
+            "arp-clear": ["cmd", "/c", "arp -d * & nbtstat -R"],
+            "restart-dns-svc": [
+                "powershell",
+                "-NoProfile",
+                "-Command",
+                "Restart-Service -Name Dnscache -Force -PassThru | Format-Table Name,Status,DisplayName -AutoSize",
+            ],
+            "winsock-reset": ["netsh", "winsock", "reset"],
+            "tcp-reset": ["netsh", "int", "ip", "reset"],
+            "admin-sockets": ["netstat", "-abno"],
+            "firewall-audit": ["netsh", "advfirewall", "show", "allprofiles"],
+            "route-table": ["route", "print", "-4"],
             "net-status": ["netsh", "interface", "ip", "show", "config"],
             "net-reset": ["netsh", "interface", "ip", "show", "config"],
             "sys-info": ["netstat", "-ep"],
@@ -796,6 +857,13 @@ def _fallback_os_action(action: str) -> Tuple[str, bool]:
     elif sys.platform == "darwin":
         cmd_map = {
             "flush-dns": ["dscacheutil", "-flushcache"],
+            "arp-clear": ["arp", "-a"],
+            "restart-dns-svc": ["killall", "-HUP", "mDNSResponder"],
+            "winsock-reset": ["netstat", "-s"],
+            "tcp-reset": ["sysctl", "net.inet.tcp"],
+            "admin-sockets": ["lsof", "-i", "-P", "-n"],
+            "firewall-audit": ["/usr/libexec/ApplicationFirewall/socketfilterfw", "--getglobalstate"],
+            "route-table": ["netstat", "-rn", "-f", "inet"],
             "net-status": ["ifconfig"],
             "net-reset": ["ifconfig"],
             "sys-info": ["uptime"],
@@ -804,6 +872,13 @@ def _fallback_os_action(action: str) -> Tuple[str, bool]:
     else:
         cmd_map = {
             "flush-dns": ["resolvectl", "flush-caches"],
+            "arp-clear": ["ip", "-s", "-s", "neigh", "flush", "all"],
+            "restart-dns-svc": ["systemctl", "restart", "systemd-resolved"],
+            "winsock-reset": ["ss", "-s"],
+            "tcp-reset": ["sysctl", "net.ipv4.tcp_congestion_control"],
+            "admin-sockets": ["ss", "-tulnp"],
+            "firewall-audit": ["ufw", "status", "verbose"],
+            "route-table": ["ip", "route", "show"],
             "net-status": ["ip", "-brief", "addr"],
             "net-reset": ["ip", "-brief", "addr"],
             "sys-info": ["uptime"],
@@ -831,7 +906,20 @@ def _execute_fallback_action(action: str, target: str) -> Tuple[str, bool]:
         return _fallback_http_check(target)
     if action == "dns-lookup":
         return _fallback_dns_lookup(target)
-    if action in ("flush-dns", "net-status", "net-reset", "sys-info", "sys-health"):
+    if action in (
+        "flush-dns",
+        "arp-clear",
+        "restart-dns-svc",
+        "winsock-reset",
+        "tcp-reset",
+        "admin-sockets",
+        "firewall-audit",
+        "route-table",
+        "net-status",
+        "net-reset",
+        "sys-info",
+        "sys-health",
+    ):
         return _fallback_os_action(action)
     return f"Unknown action '{action}'", False
 
@@ -867,6 +955,31 @@ def _supports_repl_ansi() -> bool:
     return bool(getattr(sys.stdout, "isatty", lambda: False)())
 
 
+def _copy_to_system_clipboard(text: str) -> Tuple[bool, str]:
+    if sys.platform == "win32":
+        try:
+            payload = b"\xff\xfe" + text.encode("utf-16le")
+            proc = subprocess.run(["clip"], input=payload, timeout=5)
+            return proc.returncode == 0, "" if proc.returncode == 0 else f"clip exited {proc.returncode}"
+        except Exception as exc:
+            return False, str(exc)
+    if sys.platform == "darwin":
+        try:
+            proc = subprocess.run(["pbcopy"], input=text.encode("utf-8"), timeout=5)
+            return proc.returncode == 0, "" if proc.returncode == 0 else f"pbcopy exited {proc.returncode}"
+        except Exception as exc:
+            return False, str(exc)
+    for cmd in (["wl-copy"], ["xclip", "-selection", "clipboard"], ["xsel", "--clipboard", "--input"]):
+        if shutil.which(cmd[0]):
+            try:
+                proc = subprocess.run(cmd, input=text.encode("utf-8"), timeout=5)
+                if proc.returncode == 0:
+                    return True, ""
+            except Exception:
+                pass
+    return False, "No clipboard utility found (install wl-clipboard, xclip, or xsel)"
+
+
 def _clear_repl_screen(use_color: bool) -> None:
     if use_color:
         print("\x1b[2J\x1b[3J\x1b[H", end="", flush=True)
@@ -875,25 +988,50 @@ def _clear_repl_screen(use_color: bool) -> None:
         os.system("cls" if sys.platform == "win32" else "clear")
 
 
-_REPL_OPTION_MAP: Dict[str, List[str]] = {
+_REPL_USER_OPTION_MAP: Dict[str, List[str]] = {
     "1": ["ping"],
     "ping": ["ping"],
     "2": ["port-scan"],
     "port-scan": ["port-scan"],
     "3": ["tls-check"],
     "tls-check": ["tls-check"],
-    "4": ["flush-dns"],
-    "flush-dns": ["flush-dns"],
-    "5": ["http-check"],
+    "4": ["http-check"],
     "http-check": ["http-check"],
-    "6": ["dns-lookup"],
+    "5": ["dns-lookup"],
     "dns-lookup": ["dns-lookup"],
-    "7": ["ping", "port-scan", "tls-check", "http-check", "dns-lookup", "net-status"],
-    "playbook": ["ping", "port-scan", "tls-check", "http-check", "dns-lookup", "net-status"],
+    "6": ["net-status"],
+    "net-status": ["net-status"],
+    "7": ["sys-info"],
+    "sys-info": ["sys-info"],
+    "8": ["ping", "port-scan", "tls-check", "http-check", "dns-lookup", "net-status", "sys-info"],
+    "playbook": ["ping", "port-scan", "tls-check", "http-check", "dns-lookup", "net-status", "sys-info"],
+}
+
+_REPL_ADMIN_OPTION_MAP: Dict[str, List[str]] = {
+    "1": ["flush-dns"],
+    "flush-dns": ["flush-dns"],
+    "2": ["arp-clear"],
+    "arp-clear": ["arp-clear"],
+    "3": ["restart-dns-svc"],
+    "restart-dns-svc": ["restart-dns-svc"],
+    "4": ["winsock-reset"],
+    "winsock-reset": ["winsock-reset"],
+    "5": ["tcp-reset"],
+    "tcp-reset": ["tcp-reset"],
+    "6": ["admin-sockets"],
+    "admin-sockets": ["admin-sockets"],
+    "7": ["firewall-audit"],
+    "firewall-audit": ["firewall-audit"],
+    "8": ["route-table"],
+    "route-table": ["route-table"],
+    "9": ["flush-dns", "arp-clear", "firewall-audit", "route-table", "admin-sockets"],
+    "playbook": ["flush-dns", "arp-clear", "firewall-audit", "route-table", "admin-sockets"],
 }
 
 
-def _parse_repl_selection(raw: str) -> Tuple[List[str], Optional[str]]:
+def _parse_repl_selection(raw: str, admin_mode: bool = False) -> Tuple[List[str], Optional[str]]:
+    option_map = _REPL_ADMIN_OPTION_MAP if admin_mode else _REPL_USER_OPTION_MAP
+    max_opt = 9 if admin_mode else 8
     normalized = re.sub(r"(\d+)\s*-\s*(\d+)", r"\1-\2", raw.strip().lower())
     tokens = [t for t in re.split(r"[\s,]+", normalized) if t]
 
@@ -907,19 +1045,19 @@ def _parse_repl_selection(raw: str) -> Tuple[List[str], Optional[str]]:
                 actions.append(act)
 
     for tok in tokens:
-        if tok in _REPL_OPTION_MAP:
-            _append_unique(_REPL_OPTION_MAP[tok])
+        if tok in option_map:
+            _append_unique(option_map[tok])
             continue
         m = re.fullmatch(r"(\d+)-(\d+)", tok)
         if m:
             start_num, end_num = int(m.group(1)), int(m.group(2))
-            if start_num < 1 or end_num > 7 or start_num > end_num:
-                return [], f"Invalid range '{tok}' (enter ranges within 1-7, e.g., 1-4)"
+            if start_num < 1 or end_num > max_opt or start_num > end_num:
+                return [], f"Invalid range '{tok}' (enter ranges within 1-{max_opt}, e.g., 1-4)"
             for num in range(start_num, end_num + 1):
-                _append_unique(_REPL_OPTION_MAP[str(num)])
+                _append_unique(option_map[str(num)])
             continue
         if tok.isdigit():
-            return [], f"Option '{tok}' is out of range (choose 1-7)"
+            return [], f"Option '{tok}' is out of range (choose 1-{max_opt})"
         return [], f"Unrecognized command '{tok}'"
 
     if not actions:
@@ -927,11 +1065,21 @@ def _parse_repl_selection(raw: str) -> Tuple[List[str], Optional[str]]:
     return actions, None
 
 
-def _run_fallback_repl(initial_target: str) -> int:
+def _run_fallback_repl(initial_target: str, cli_mode: str = "auto") -> int:
     target = initial_target.strip() or "1.1.1.1"
     goos = "windows" if sys.platform == "win32" else ("darwin" if sys.platform == "darwin" else "linux")
     arch = platform.machine().lower() or "amd64"
-    priv_badge = "[ADMIN / ROOT]" if _is_fallback_admin() else "[STANDARD USER]"
+
+    mode_clean = cli_mode.strip().lower()
+    if mode_clean == "admin":
+        admin_mode = True
+    elif mode_clean == "user":
+        admin_mode = False
+    else:
+        admin_mode = _is_fallback_admin()
+
+    max_opt = 9 if admin_mode else 8
+    prompt_label = "TimeSpace-Admin⚡> " if admin_mode else "TimeSpace-User> "
 
     use_color = _supports_repl_ansi()
     p_bold = _hex_to_ansi_fg(COLORS["accent"], bold=True) if use_color else ""
@@ -940,25 +1088,49 @@ def _run_fallback_repl(initial_target: str) -> int:
     fail_col = _hex_to_ansi_fg(COLORS["accent_danger"], bold=True) if use_color else ""
     rst = "\x1b[0m" if use_color else ""
 
+    last_output = ""
     while True:
         print(f"{p_bold}═══════════════════════════════════════════════════════════════════{rst}", flush=True)
-        print(f"{p_bold}  🪻 TimeSpace Go Diagnostic REPL | {goos}/{arch} | {priv_badge}{rst}", flush=True)
-        print(f"{p_bold}  Active Target: {target}{rst}", flush=True)
-        print(f"{p_bold}═══════════════════════════════════════════════════════════════════{rst}", flush=True)
-        print(f"{p_norm}  [1] Ping & TCP Reachability{rst}", flush=True)
-        print(f"{p_norm}  [2] Concurrent Port Scan (22, 53, 80, 443, 3389, 8080){rst}", flush=True)
-        print(f"{p_norm}  [3] TLS Certificate Inspector{rst}", flush=True)
-        print(f"{p_norm}  [4] Flush DNS Cache (OS Fix){rst}", flush=True)
-        print(f"{p_norm}  [5] HTTP/HTTPS Status & Latency Probe{rst}", flush=True)
-        print(f"{p_norm}  [6] DNS Records Inspector (A / AAAA / MX / NS / TXT){rst}", flush=True)
-        print(f"{p_norm}  [7] Automated Network Triage Playbook (All Checks){rst}", flush=True)
+        if admin_mode:
+            print(
+                f"{p_bold}  ⚡🪻 TimeSpace Go Admin Remediation CLI [ELEVATED ADMIN / ROOT] | {goos}/{arch}{rst}",
+                flush=True,
+            )
+            print(f"{p_bold}  Active Target: {target}{rst}", flush=True)
+            print(f"{p_bold}═══════════════════════════════════════════════════════════════════{rst}", flush=True)
+            print(f"{p_norm}  [1] Flush OS DNS Resolver Cache (ipconfig /flushdns){rst}", flush=True)
+            print(f"{p_norm}  [2] Clear ARP & NetBIOS Name Cache (arp -d & nbtstat -R){rst}", flush=True)
+            print(f"{p_norm}  [3] Restart OS DNS Client Service (Dnscache / systemd-resolved){rst}", flush=True)
+            print(f"{p_norm}  [4] Reset Winsock Catalog (netsh winsock reset){rst}", flush=True)
+            print(f"{p_norm}  [5] Reset TCP/IP Stack (netsh int ip reset){rst}", flush=True)
+            print(f"{p_norm}  [6] Elevated Port & Process Owner Audit (netstat -abno / ss -tulnp){rst}", flush=True)
+            print(f"{p_norm}  [7] OS Firewall Profiles & Policy Audit (advfirewall / ufw){rst}", flush=True)
+            print(f"{p_norm}  [8] Kernel IPv4 Routing Table & Gateway Audit (route print -4){rst}", flush=True)
+            print(f"{p_norm}  [9] Automated Admin Repair & Audit Playbook (Flush DNS + ARP + Audits){rst}", flush=True)
+        else:
+            print(
+                f"{p_bold}  🪻 TimeSpace Go Diagnostic CLI [STANDARD USER MODE] | {goos}/{arch}{rst}",
+                flush=True,
+            )
+            print(f"{p_bold}  Active Target: {target}{rst}", flush=True)
+            print(f"{p_bold}═══════════════════════════════════════════════════════════════════{rst}", flush=True)
+            print(f"{p_norm}  [1] Ping & TCP Reachability Probe (Ports 443, 80, 53){rst}", flush=True)
+            print(f"{p_norm}  [2] Concurrent TCP Port Scan (22, 53, 80, 443, 3389, 8080){rst}", flush=True)
+            print(f"{p_norm}  [3] TLS / X.509 Certificate Inspector{rst}", flush=True)
+            print(f"{p_norm}  [4] HTTP/HTTPS Status, Redirect & Latency Probe{rst}", flush=True)
+            print(f"{p_norm}  [5] DNS Records Inspector (A / AAAA / CNAME / MX / NS / TXT){rst}", flush=True)
+            print(f"{p_norm}  [6] Network Interface & IP Config Summary (Non-Admin){rst}", flush=True)
+            print(f"{p_norm}  [7] Active Socket & System Uptime Summary (Non-Admin){rst}", flush=True)
+            print(f"{p_norm}  [8] Automated Standard User Diagnostic Playbook (Runs 1–7){rst}", flush=True)
         print(f"{p_norm}  ─────────────────────────────────────────────────────────────────{rst}", flush=True)
         print(f"{p_norm}  Multi-Select   — Enter multiple or ranges (e.g., 1,3,4 or 1-4, 6){rst}", flush=True)
         print(f"{p_norm}  target <host>  — Change active target host/IP{rst}", flush=True)
+        print(f"{p_norm}  copy           — Copy last diagnostic output to clipboard{rst}", flush=True)
+        print(f"{p_norm}  save [fmt]     — Export last output to C:\\Temp (.md, .txt, or .json){rst}", flush=True)
         print(f"{p_norm}  clr            — Clear terminal screen{rst}", flush=True)
         print(f"{p_norm}  exit           — Close interactive session{rst}", flush=True)
         try:
-            print(f"\n{p_bold}TimeSpace-Go> {rst}", end="", flush=True)
+            print(f"\n{p_bold}{prompt_label}{rst}", end="", flush=True)
             raw = input()
         except EOFError:
             print(flush=True)
@@ -974,6 +1146,42 @@ def _run_fallback_repl(initial_target: str) -> int:
         if lower in ("clr", "clear", "cls"):
             _clear_repl_screen(use_color)
             continue
+        if lower in ("copy", "cp"):
+            if not last_output.strip():
+                print(
+                    f"{fail_col}✖ No diagnostic output to copy yet. Run an option (1-{max_opt}) first.{rst}\n",
+                    flush=True,
+                )
+                continue
+            copied_ok, clip_err = _copy_to_system_clipboard(last_output)
+            if copied_ok:
+                line_count = len(last_output.strip().splitlines())
+                print(
+                    f"{ok_col}✔ Copied last diagnostic output ({line_count} lines) to clipboard.{rst}\n",
+                    flush=True,
+                )
+            else:
+                print(f"{fail_col}✖ Failed to copy to clipboard: {clip_err}{rst}\n", flush=True)
+            continue
+        if lower == "save" or lower.startswith("save ") or lower == "export" or lower.startswith("export "):
+            if not last_output.strip():
+                print(
+                    f"{fail_col}✖ No diagnostic output to save yet. Run an option (1-{max_opt}) first.{rst}\n",
+                    flush=True,
+                )
+                continue
+            parts = cmd.split(None, 1)
+            arg_val = parts[1].strip() if len(parts) > 1 else "md"
+            fmt_clean = arg_val.lower().lstrip(".")
+            try:
+                if fmt_clean in ("md", "txt", "json"):
+                    saved_path = Storage.export_diagnostic_report(last_output, target, fmt=fmt_clean)
+                else:
+                    saved_path = Storage.export_diagnostic_report(last_output, target, filepath=arg_val)
+                print(f"{ok_col}✔ Saved diagnostic report to: {saved_path}{rst}\n", flush=True)
+            except Exception as exc:
+                print(f"{fail_col}✖ Failed to save diagnostic report: {exc}{rst}\n", flush=True)
+            continue
         if lower.startswith("target "):
             new_tgt = cmd[7:].strip()
             if new_tgt:
@@ -981,25 +1189,35 @@ def _run_fallback_repl(initial_target: str) -> int:
                 print(f"{ok_col}✔ Active target updated to: {target}{rst}\n", flush=True)
             continue
 
-        actions, parse_err = _parse_repl_selection(cmd)
+        actions, parse_err = _parse_repl_selection(cmd, admin_mode=admin_mode)
         if parse_err is not None:
             print(
-                f"{fail_col}✖ {parse_err}. Enter 1-7 (e.g., 1,3,4 or 1-4, 6), 'target <host>', 'clr', or 'exit'.{rst}\n",
+                f"{fail_col}✖ {parse_err}. Enter 1-{max_opt} (e.g., 1,3,4 or 1-4, 6), 'target <host>', 'copy', 'save', 'clr', or 'exit'.{rst}\n",
                 flush=True,
             )
             continue
 
         total = len(actions)
+        mode_tag = "ADMIN" if admin_mode else "USER"
+        batch_lines: List[str] = [f"[TimeSpace-Go {mode_tag} | {goos}/{arch} | target: {target}]"]
         for idx, act in enumerate(actions, start=1):
             step_prefix = f"[{idx}/{total}] " if total > 1 else ""
-            print(f"\n{p_bold}▶ {step_prefix}Running '{act}' on '{target}'...{rst}", flush=True)
+            header_line = f"▶ {step_prefix}Running '{act}' on '{target}'..."
+            print(f"\n{p_bold}{header_line}{rst}", flush=True)
+            batch_lines.append(header_line)
             out, ok = _execute_fallback_action(act, target)
             if out:
                 print(out, flush=True)
+                batch_lines.append(out)
             if ok:
-                print(f"{ok_col}✔ [PASS] {act} completed.{rst}", flush=True)
+                pass_line = f"✔ [PASS] {act} completed."
+                print(f"{ok_col}{pass_line}{rst}", flush=True)
+                batch_lines.append(pass_line)
             else:
-                print(f"{fail_col}✖ [FAIL] {act} completed.{rst}", flush=True)
+                fail_line = f"✖ [FAIL] {act} completed."
+                print(f"{fail_col}{fail_line}{rst}", flush=True)
+                batch_lines.append(fail_line)
+        last_output = "\n".join(batch_lines)
         print(flush=True)
 
 
@@ -1007,6 +1225,7 @@ def _run_fallback_cli() -> int:
     parser = argparse.ArgumentParser(add_help=False)
     parser.add_argument("--fallback-cli", action="store_true")
     parser.add_argument("--interactive", action="store_true")
+    parser.add_argument("--cli-mode", default="auto")
     parser.add_argument("--action", default="ping")
     parser.add_argument("--target", default="1.1.1.1")
     known, _ = parser.parse_known_args()
@@ -1015,7 +1234,7 @@ def _run_fallback_cli() -> int:
     target = known.target.strip() or "1.1.1.1"
 
     if known.interactive:
-        return _run_fallback_repl(target)
+        return _run_fallback_repl(target, cli_mode=known.cli_mode)
 
     goos = "windows" if sys.platform == "win32" else ("darwin" if sys.platform == "darwin" else "linux")
     arch = platform.machine().lower() or "amd64"

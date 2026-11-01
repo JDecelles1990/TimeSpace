@@ -25,6 +25,20 @@ func runOSAction(action string, target string) (string, error) {
 	switch action {
 	case "flush-dns":
 		cmd = exec.CommandContext(ctx, "dscacheutil", "-flushcache")
+	case "arp-clear":
+		cmd = exec.CommandContext(ctx, "arp", "-a")
+	case "restart-dns-svc":
+		cmd = exec.CommandContext(ctx, "killall", "-HUP", "mDNSResponder")
+	case "winsock-reset":
+		cmd = exec.CommandContext(ctx, "netstat", "-s")
+	case "tcp-reset":
+		cmd = exec.CommandContext(ctx, "sysctl", "net.inet.tcp")
+	case "admin-sockets":
+		cmd = exec.CommandContext(ctx, "lsof", "-i", "-P", "-n")
+	case "firewall-audit":
+		cmd = exec.CommandContext(ctx, "/usr/libexec/ApplicationFirewall/socketfilterfw", "--getglobalstate")
+	case "route-table":
+		cmd = exec.CommandContext(ctx, "netstat", "-rn", "-f", "inet")
 	case "net-status", "net-reset":
 		cmd = exec.CommandContext(ctx, "ifconfig")
 	case "sys-info", "sys-health":

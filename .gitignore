@@ -29,3 +29,4 @@ data/history.json
 data/scratchpad.json
 !data/.gitkeep
 !data/settings.example.json
+reports/
