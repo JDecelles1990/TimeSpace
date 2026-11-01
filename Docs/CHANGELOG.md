@@ -5,6 +5,46 @@
 
 ---
 
+## [v3.6] — `5. Go ⏱️` Enhancements: Color Console, Scratchpad Bridge, HTTP/DNS Probes, Presets & Binary Builder (2026-11-01)
+- **Color-Coded Live Output Console (`src/go_tab.py`)**:
+  - Added `GoConsoleHighlighter(QSyntaxHighlighter)` highlighting `[PASS]`/`OPEN`/`✔`/`200 OK` in emerald green, `[FAIL]`/`[ERROR]`/`[STDERR]`/`UNREACHABLE`/`✖` in crimson red, `CLOSED/FILTERED`/`[WARN]`/`[STOPPED]`/`ELEVATED` in amber, and `═══` action headers in sky cyan using `COLORS` tokens.
+- **1-Click Clipboard Copy & `+Scratchpad` Integration (`src/go_tab.py`, `src/gui.py`)**:
+  - Added **`📋 Copy`** (`copy_console_output()`) and **`📝 +Scratchpad`** (`send_console_to_scratchpad()`, emitting `sendToScratchpad = Signal(str)`) to the console toolbar, wired to `TimerRendezVousWidget._append_to_scratchpad()` so diagnostic logs append cleanly with a timestamped header into Tab 4 (`4. Scratchpad 📝`) and auto-save immediately.
+- **Expanded Diagnostic Suite to 8 Actions (`src/config.py`, `src/go_tab.py`, `go_engine/main.go`, `go_engine/diag_common.go`)**:
+  - Added **`🌍 HTTP/S Probe`** (`--action=http-check`: HTTP/HTTPS status code, protocol, latency, redirect URL, and `Server` header) and **`🧭 DNS Lookup`** (`--action=dns-lookup`: `A`, `AAAA`, `CNAME`, `MX`, `NS`, and `TXT` records) in a `2×4` action grid across both pure Go (`go_engine/`) and the built-in Python fallback engine.
+  - Upgraded the `--interactive` external REPL (`go_engine/main.go`, `go_engine/fixes_*.go`, and `src/go_tab.py`) with:
+    - Options `[5] HTTP/HTTPS Status & Latency Probe`, `[6] DNS Records Inspector`, and `[7] Automated Network Triage Playbook`.
+    - **Multi-number & range selection** (`1,3,4`, `1-4, 6`) with deduplicated sequential execution and `[i/total]` step progress.
+    - **`clr` command** (plus `clear`/`cls` aliases) to clear the terminal viewport and scrollback buffer.
+    - **TimeSpace Purple (`#6366f1`)** TrueColor ANSI main menu styling with native Windows Virtual Terminal Processing (`ENABLE_VIRTUAL_TERMINAL_PROCESSING`) and UTF-8 console codepage setup.
+- **Quick Target Presets & 1-Click Binary Builder (`src/config.py`, `src/__init__.py`, `src/go_tab.py`)**:
+  - Added `GO_TARGET_PRESETS` (`Cloudflare 1.1.1.1`, `Google 8.8.8.8`, `github.com`, `google.com`, `microsoft.com`, `127.0.0.1`) next to the Target input and **`🔨 Build Binaries`** (`build_go_binaries()`) to cross-compile `go_engine/build_all.ps1` non-blockingly via `QProcess` and refresh the engine readiness badge.
+
+---
+
+## [v3.5] — `5. Go ⏱️` Cross-Platform Diagnostic & Troubleshooting Module (2026-11-01)
+- **Inserted `5. Go ⏱️` Tab Between `Scratchpad` and `History` (`src/go_tab.py`, `src/gui.py`, `src/config.py`, `src/__init__.py`)**:
+  - Added `GoTroubleshootingTab(QWidget)` (`src/go_tab.py`) as Tab 5 (`5. Go ⏱️`), renumbering `History` to `6. History 📜` and `Settings` to `7. Settings ⚙️`, and tightened `QTabBar::tab` padding in `DARK_QSS` (`5px 7px`) so all 7 tabs fit on one row.
+  - Implemented non-blocking process execution via `PySide6.QtCore.QProcess` and `pathlib.Path` with an Engine Mode selector (`Compiled Binary Mode` vs `Go Script Mode`), Target Host/IP + CLI Args inputs, a 2×3 grid of 6 diagnostic actions (`GO_DIAG_ACTIONS`), an external interactive CLI launcher bar (**`⚡ Run as Admin / sudo (Elevated Fixes)`** + **`🚀 Launch Interactive Go CLI (External Terminal)`** via Win32 `ShellExecuteW` + UTF-16LE `-EncodedCommand` on Windows and `QProcess.startDetached` on Linux/macOS), indeterminate `QProgressBar`, `⏹ Stop Process`, `🧹 Clear Console`, and a read-only monospace live console.
+  - Added automatic JSON result parsing (`[PASS]` / `[FAIL]` banners), full-height console expansion on Tab 5 (auto-hiding `Active Reminders Queue` only while `5. Go ⏱️` is active), and connected `diagnostic_completed = Signal(dict)` to log completed diagnostic runs into `6. History 📜` via `Storage.add_history_entry(HistoryEntry(...))`.
+  - Included a built-in asynchronous `QProcess` fallback worker and interactive REPL (`--interactive`) in `src/go_tab.py` so all 6 diagnostic actions and external terminal sessions run out of the box even when `bin/diag_*` has not been compiled yet and `go` is not on `PATH`.
+- **Created Cross-Platform Go Engine (`go_engine/` & `bin/`)**:
+  - Created `go_engine/go.mod`, `main.go` (supporting `--action`, `--target`, and `--interactive` REPL with `[ADMIN / ROOT]` vs `[STANDARD USER]` banner), `diag_common.go` (goroutine + `sync.WaitGroup` concurrent TCP port scan, `crypto/tls` certificate inspection, and TCP reachability probe), OS-specific build-tagged files (`fixes_windows.go`, `fixes_linux.go`, `fixes_darwin.go` implementing `isAdmin() bool` and `runOSAction()`), and `go_engine/build_all.ps1` (`CGO_ENABLED=0` cross-compiler for Windows, Linux, and macOS).
+
+---
+
+## [v3.4] — Rich-Text Scratchpad: Highlighted Bold, Text Color & Clickable Web Links (2026-11-01)
+- **Rich-Text Scratchpad Formatting (`src/gui.py`, `src/config.py`, `src/__init__.py`)**:
+  - Upgraded Tab 4 (`4. Scratchpad 📝`) from `QPlainTextEdit` to `ScratchpadEditor(QTextEdit)` with rich-text formatting and clean plain-text external clipboard paste (`insertFromMimeData`).
+  - Added **`𝐁 Bold`** button (`Ctrl+B` shortcut) to toggle bold weight on highlighted text (or current typing cursor).
+  - Added **`🎨 Color`** button opening a dark-themed `QMenu` with 8 color swatches (`SCRATCHPAD_TEXT_COLORS` in `src/config.py`) plus **`🎨 Custom Color...`** (`QColorDialog`) to recolor highlighted text.
+  - Extended `ScratchpadState` (`src/config.py`) with an `html: str = ""` field so bold and custom text colors persist across restarts in `data/scratchpad.json` while remaining backward-compatible with plain-text `content`.
+- **Detectable & Clickable Web Links in Scratchpad (`src/gui.py`)**:
+  - Added `ScratchpadUrlHighlighter(QSyntaxHighlighter)` to automatically detect and underline web links (`https://`, `http://`, `www.`, and bare domains) in real time using `COLORS["accent_link"]` (`#38bdf8`) while preserving user-applied bold and custom foreground colors.
+  - Added pixel-accurate hover/click detection (`ScratchpadEditor._url_at_pos()`) that changes the cursor to a pointing hand (`👆`) with a target tooltip on hover and opens the link in the default browser via `open_attachment_link()` on a single left-click (without interfering with click-and-drag text selection).
+
+---
+
 ## [v3.3] — TimeSpace Rebrand, Actionable Links/Notes, Monthly Recurrence & Overlay Opacity (2026-10-31)
 - **Rebranded Application & Repository to `TimeSpace`**:
   - Updated `APP_TITLE` and `APP_REGISTRY_NAME` to `"TimeSpace"` (`src/config.py`), added `TimeSpaceWidget` alias (`src/gui.py`, `src/__init__.py`), and published to the standalone GitHub repository `JDecelles1990/TimeSpace` while preserving the legacy Tkinter repository separately.
@@ -69,4 +109,3 @@
 - **Core Capabilities**: Multi-threaded `ReminderScheduler` with pause/resume, sleep/hibernation clock-drift detection (`gap > 6.0s`), cold-start missed-alarm catch-up, `NaturalParser` English grammar, RFC 5545 `.ics` import/export, Windows MCI hardware volume (`0–1000`) & 15s fade-in escalation, Action Center native toasts, `winreg` boot startup, and `FloatingMiniHUD`.
 - **Intentionally Removed Features**:
   - **Pomodoro Focus Mode & Tray Pomodoro Shortcuts**: Removed permanently by user request; do not re-implement.
-

@@ -1,0 +1,2 @@
+# Compiled Go diagnostic binaries (diag_windows.exe, diag_linux, diag_mac_arm64) are output here by go_engine/build_all.ps1
+

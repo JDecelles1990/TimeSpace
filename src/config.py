@@ -19,6 +19,7 @@ COLORS: Dict[str, str] = {
     "surface_light": "#262632",
     "accent": "#6366f1",
     "accent_hover": "#4f46e5",
+    "accent_link": "#38bdf8",
     "accent_danger": "#ef4444",
     "accent_warning": "#f59e0b",
     "accent_success": "#10b981",
@@ -75,6 +76,37 @@ QUICK_TIMER_PRESETS: List[Tuple[str, int]] = [
 
 SNOOZE_OPTIONS: List[int] = [5, 10, 15, 30]
 
+SCRATCHPAD_TEXT_COLORS: List[Tuple[str, str]] = [
+    ("Default (White)", "#f4f4f5"),
+    ("Indigo Accent", "#818cf8"),
+    ("Sky Cyan", "#38bdf8"),
+    ("Emerald Green", "#34d399"),
+    ("Amber Gold", "#fbbf24"),
+    ("Coral Orange", "#fb923c"),
+    ("Crimson Red", "#f87171"),
+    ("Violet Purple", "#c084fc"),
+]
+
+GO_DIAG_ACTIONS: List[Tuple[str, str]] = [
+    ("🌐 Ping & TCP Reach", "ping"),
+    ("🔍 Port Scan", "port-scan"),
+    ("🔒 TLS Cert Check", "tls-check"),
+    ("🌍 HTTP/S Probe", "http-check"),
+    ("🧭 DNS Lookup", "dns-lookup"),
+    ("🧹 Flush DNS", "flush-dns"),
+    ("🖧 Net Stack Triage", "net-status"),
+    ("📊 Uptime & Sockets", "sys-info"),
+]
+
+GO_TARGET_PRESETS: List[Tuple[str, str]] = [
+    ("Cloudflare DNS (1.1.1.1)", "1.1.1.1"),
+    ("Google DNS (8.8.8.8)", "8.8.8.8"),
+    ("GitHub (github.com)", "github.com"),
+    ("Google (google.com)", "google.com"),
+    ("Microsoft (microsoft.com)", "microsoft.com"),
+    ("Localhost (127.0.0.1)", "127.0.0.1"),
+]
+
 
 # ---------------------------------------------------------------------------
 # Professional Dark-Mode PySide6 QSS Stylesheet
@@ -120,7 +152,7 @@ QTabBar::tab {{
     border-bottom: none;
     border-top-left-radius: 5px;
     border-top-right-radius: 5px;
-    padding: 5px 9px;
+    padding: 5px 7px;
     margin-right: 2px;
     font-size: 11px;
     font-weight: bold;
@@ -220,6 +252,30 @@ QPushButton#dangerBtn:hover {{
     color: #ffffff;
 }}
 
+QMenu {{
+    background-color: {COLORS["surface"]};
+    color: {COLORS["text"]};
+    border: 1px solid {COLORS["border"]};
+    border-radius: 5px;
+    padding: 4px;
+}}
+
+QMenu::item {{
+    padding: 5px 14px 5px 10px;
+    border-radius: 3px;
+}}
+
+QMenu::item:selected {{
+    background-color: {COLORS["accent"]};
+    color: #ffffff;
+}}
+
+QMenu::separator {{
+    height: 1px;
+    background: {COLORS["border"]};
+    margin: 4px 6px;
+}}
+
 QSlider::groove:horizontal {{
     border: 1px solid {COLORS["border"]};
     height: 6px;
@@ -311,6 +367,7 @@ class HistoryEntry:
 class ScratchpadState:
     """Persistent state for the Time Notes Scratchpad (Tab 4)."""
     content: str = ""
+    html: str = ""
     updated_at: str = ""
 
     def to_dict(self) -> Dict[str, Any]:
@@ -320,5 +377,6 @@ class ScratchpadState:
     def from_dict(cls, data: Dict[str, Any]) -> "ScratchpadState":
         return cls(
             content=data.get("content", ""),
+            html=str(data.get("html", "") or ""),
             updated_at=data.get("updated_at", ""),
         )

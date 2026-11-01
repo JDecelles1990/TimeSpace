@@ -65,6 +65,7 @@ Persisted to `data/scratchpad.json` via `Storage.load_scratchpad()` / `Storage.s
 | Field | Type | Default | Purpose |
 |---|---|---|---|
 | `content` | `str` | `""` | Full plain-text body of Tab 4 (`4. Scratchpad 📝`). |
+| `html` | `str` | `""` | Rich-text HTML representation preserving bold and custom foreground text colors across sessions. |
 | `updated_at` | `str` | `""` | Last auto-save time (`"%H:%M:%S"`) displayed in the Scratchpad toolbar. |
 
 ---
@@ -90,11 +91,12 @@ Persisted to `data/scratchpad.json` via `Storage.load_scratchpad()` / `Storage.s
 ### 2.3 `COLORS` Dark Palette & `DARK_QSS` Selectors
 - **Surfaces & Borders**: `bg_dark` (`#111116`), `surface` (`#1a1a22`), `surface_light` (`#262632`), `border` (`#2e2e3d`).
 - **Typography**: `text` (`#f4f4f5`), `text_muted` (`#9ca3af`).
-- **Semantic Accents**: `accent` (`#6366f1`), `accent_hover` (`#4f46e5`), `accent_success` (`#10b981`), `accent_warning` (`#f59e0b`), `accent_danger` (`#ef4444`).
-- **QSS Semantic `objectName` IDs** (applied via `widget.setObjectName(...)` to inherit styled variants from `DARK_QSS`):
+- **Semantic Accents**: `accent` (`#6366f1`), `accent_hover` (`#4f46e5`), `accent_link` (`#38bdf8`), `accent_success` (`#10b981`), `accent_warning` (`#f59e0b`), `accent_danger` (`#ef4444`).
+- **QSS Semantic `objectName` IDs & Popup Menus** (applied via `widget.setObjectName(...)` or `DARK_QSS`):
   - `#primaryBtn`: Indigo primary action button (`Create ⚡`, `Start Timer ▶`, `Add RDV 📅`, `+Timestamp`).
   - `#successBtn`: Emerald confirmation/action button (`Save Settings ✓`, `🔗 Open Link`).
   - `#dangerBtn`: Muted button with crimson text that fills crimson on hover (`⏹ Stop`, `🗑️ Delete`, `🧹 Clear`).
+  - `QMenu`: Dark surface popup menu with indigo hover highlight for Scratchpad text color selection.
 - **List Density**: `QListWidget` uses `11px` font and `2px 6px` item padding so the persistent Active Reminders Queue displays 7–9+ rows simultaneously and Activity lists display ~15+ rows.
 
 ### 2.4 Shared Domain Presets
@@ -102,6 +104,9 @@ Persisted to `data/scratchpad.json` via `Storage.load_scratchpad()` / `Storage.s
 - `CATEGORIES`: `["📌 General", "💼 Work", "📞 Callback", "🔄 Follow-up", "🎫 Ticket", "🩺 Health", "🏠 Personal"]`
 - `SNOOZE_OPTIONS`: `[5, 10, 15, 30]` (minutes)
 - `SOUND_PRESETS`: `{"gentle": ..., "digital": ..., "urgent": ..., "custom": ...}`
+- `SCRATCHPAD_TEXT_COLORS`: `[("Default (White)", "#f4f4f5"), ("Indigo Accent", "#818cf8"), ("Sky Cyan", "#38bdf8"), ("Emerald Green", "#34d399"), ("Amber Gold", "#fbbf24"), ("Coral Orange", "#fb923c"), ("Crimson Red", "#f87171"), ("Violet Purple", "#c084fc")]`
+- `GO_DIAG_ACTIONS`: `[("🌐 Ping & TCP Reach", "ping"), ("🔍 Port Scan", "port-scan"), ("🔒 TLS Cert Check", "tls-check"), ("🌍 HTTP/S Probe", "http-check"), ("🧭 DNS Lookup", "dns-lookup"), ("🧹 Flush DNS", "flush-dns"), ("🖧 Net Stack Triage", "net-status"), ("📊 Uptime & Sockets", "sys-info")]`
+- `GO_TARGET_PRESETS`: `[("Cloudflare DNS (1.1.1.1)", "1.1.1.1"), ("Google DNS (8.8.8.8)", "8.8.8.8"), ("GitHub (github.com)", "github.com"), ("Google (google.com)", "google.com"), ("Microsoft (microsoft.com)", "microsoft.com"), ("Localhost (127.0.0.1)", "127.0.0.1")]`
 - `SLA_PRESETS`: `[]` *(emptied intentionally; kept as an exported symbol for package backward compatibility).*
 
 ---
@@ -115,4 +120,3 @@ All runtime state is stored locally in `data/` (auto-created on first call via `
 - `data/scratchpad.json` — `ScratchpadState` object.
 
 *Note*: `Storage.load_settings()` and `Storage.save_settings()` remain as thin compatibility wrappers around `load_config()` and `save_config()`, and `save_config` / `add_history_entry` / `save_scratchpad` accept either typed dataclasses or plain `dict` instances.
-

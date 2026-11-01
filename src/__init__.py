@@ -12,6 +12,9 @@ from src.config import (
     SLA_PRESETS,
     QUICK_TIMER_PRESETS,
     SNOOZE_OPTIONS,
+    SCRATCHPAD_TEXT_COLORS,
+    GO_DIAG_ACTIONS,
+    GO_TARGET_PRESETS,
     AppConfig,
     HistoryEntry,
     ScratchpadState,
@@ -19,6 +22,7 @@ from src.config import (
 from src.storage import Storage
 from src.scheduler import ReminderScheduler, ScheduledItem
 from src.hotkey_manager import GlobalHotkeyListener
+from src.go_tab import GoTroubleshootingTab
 from src.gui import TimerRendezVousWidget, TimeSpaceWidget, MainApp
 
 __all__ = [
@@ -34,6 +38,9 @@ __all__ = [
     "SLA_PRESETS",
     "QUICK_TIMER_PRESETS",
     "SNOOZE_OPTIONS",
+    "SCRATCHPAD_TEXT_COLORS",
+    "GO_DIAG_ACTIONS",
+    "GO_TARGET_PRESETS",
     "AppConfig",
     "HistoryEntry",
     "ScratchpadState",
@@ -41,6 +48,7 @@ __all__ = [
     "ReminderScheduler",
     "ScheduledItem",
     "GlobalHotkeyListener",
+    "GoTroubleshootingTab",
     "TimerRendezVousWidget",
     "TimeSpaceWidget",
     "MainApp",

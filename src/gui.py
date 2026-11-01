@@ -1,12 +1,24 @@
 """PySide6 UI for TimeSpace (F7Hub Modular Widget & Standalone Window)."""
 import sys
 import os
+import re
 import time
 import datetime
-from typing import Optional, List
+from typing import Optional, List, Tuple
 
-from PySide6.QtCore import Qt, QTimer, Signal, QObject
-from PySide6.QtGui import QShortcut, QKeySequence, QColor, QGuiApplication
+from PySide6.QtCore import Qt, QTimer, Signal, QObject, QPoint
+from PySide6.QtGui import (
+    QShortcut,
+    QKeySequence,
+    QColor,
+    QGuiApplication,
+    QSyntaxHighlighter,
+    QTextCharFormat,
+    QTextCursor,
+    QFont,
+    QPixmap,
+    QIcon,
+)
 from PySide6.QtWidgets import (
     QApplication,
     QMainWindow,
@@ -24,11 +36,13 @@ from PySide6.QtWidgets import (
     QCheckBox,
     QListWidget,
     QListWidgetItem,
-    QPlainTextEdit,
+    QTextEdit,
     QSlider,
     QFileDialog,
     QMessageBox,
     QFrame,
+    QMenu,
+    QColorDialog,
 )
 
 from src.config import (
@@ -41,6 +55,7 @@ from src.config import (
     CATEGORIES,
     QUICK_TIMER_PRESETS,
     SNOOZE_OPTIONS,
+    SCRATCHPAD_TEXT_COLORS,
     AppConfig,
     HistoryEntry,
     ScratchpadState,
@@ -59,6 +74,116 @@ from src.startup import is_startup_enabled, set_startup_enabled
 from src.mini_hud import FloatingMiniHUD
 from src.hotkey_manager import GlobalHotkeyListener
 from src.notifications import open_attachment_link, normalize_link_target
+from src.go_tab import GoTroubleshootingTab
+
+
+_SCRATCHPAD_URL_RE = re.compile(
+    r"(?:https?://|ftp://|mailto:|www\.)[^\s<>\"']+"
+    r"|\b(?:[a-zA-Z0-9-]+\.)+(?:com|org|net|edu|gov|io|dev|ca|co|uk|fr|de|ai|app|me|info|biz|tv|gg|sh|xyz|tech|cloud|local)(?:/[^\s<>\"']*)?",
+    re.IGNORECASE,
+)
+
+
+def _trim_url_match(raw: str, start: int) -> Tuple[str, int, int]:
+    """Strip trailing sentence punctuation from a matched URL while keeping balanced parentheses."""
+    end = start + len(raw)
+    while raw and raw[-1] in ".,;:!?'\"}>]":
+        raw = raw[:-1]
+        end -= 1
+    while raw.endswith(")") and raw.count(")") > raw.count("("):
+        raw = raw[:-1]
+        end -= 1
+    return raw, start, end
+
+
+class ScratchpadUrlHighlighter(QSyntaxHighlighter):
+    """Real-time URL highlighter that underlines detectable web links while preserving custom text colors and bold."""
+
+    def highlightBlock(self, text: str) -> None:
+        if not text:
+            return
+        default_fg = COLORS["text"].lower()
+        custom_fg_positions = set()
+        for fr in self.currentBlock().textFormats():
+            if fr.format.hasProperty(QTextCharFormat.Property.ForegroundBrush):
+                fg_hex = fr.format.foreground().color().name().lower()
+                if fg_hex not in (default_fg, "#000000"):
+                    for pos in range(fr.start, fr.start + fr.length):
+                        custom_fg_positions.add(pos)
+
+        for match in _SCRATCHPAD_URL_RE.finditer(text):
+            url_str, start, end = _trim_url_match(match.group(0), match.start())
+            if not url_str or end <= start:
+                continue
+            for idx in range(start, end):
+                fmt = QTextCharFormat()
+                fmt.setFontUnderline(True)
+                if idx not in custom_fg_positions:
+                    fmt.setForeground(QColor(COLORS["accent_link"]))
+                self.setFormat(idx, 1, fmt)
+
+
+class ScratchpadEditor(QTextEdit):
+    """Rich-text Scratchpad editor supporting bold, custom text colors, and 1-click detectable web links."""
+
+    linkActivated = Signal(str)
+
+    def __init__(self, parent: Optional[QWidget] = None):
+        super().__init__(parent)
+        self.setAcceptRichText(True)
+        self.viewport().setMouseTracking(True)
+        self._press_pos = QPoint()
+        self._had_selection_on_press = False
+        self._highlighter = ScratchpadUrlHighlighter(self.document())
+
+    def _url_at_pos(self, pos: QPoint) -> str:
+        cursor = self.cursorForPosition(pos)
+        rect = self.cursorRect(cursor)
+        if pos.y() < rect.top() - 4 or pos.y() > rect.bottom() + 4:
+            return ""
+        if abs(pos.x() - rect.x()) > 16:
+            return ""
+        block_text = cursor.block().text()
+        if not block_text:
+            return ""
+        col = cursor.positionInBlock()
+        for match in _SCRATCHPAD_URL_RE.finditer(block_text):
+            url_str, start, end = _trim_url_match(match.group(0), match.start())
+            if url_str and start <= col < end:
+                return url_str
+        return ""
+
+    def mouseMoveEvent(self, event) -> None:
+        url = self._url_at_pos(event.pos())
+        if url:
+            self.viewport().setCursor(Qt.CursorShape.PointingHandCursor)
+            self.viewport().setToolTip(f"Click to open link: {normalize_link_target(url)}")
+        else:
+            self.viewport().setCursor(Qt.CursorShape.IBeamCursor)
+            self.viewport().setToolTip("")
+        super().mouseMoveEvent(event)
+
+    def mousePressEvent(self, event) -> None:
+        if event.button() == Qt.MouseButton.LeftButton:
+            self._press_pos = event.pos()
+            self._had_selection_on_press = self.textCursor().hasSelection()
+        super().mousePressEvent(event)
+
+    def mouseReleaseEvent(self, event) -> None:
+        super().mouseReleaseEvent(event)
+        if event.button() == Qt.MouseButton.LeftButton:
+            is_click = (event.pos() - self._press_pos).manhattanLength() < 6
+            if is_click and not self.textCursor().hasSelection() and not self._had_selection_on_press:
+                url = self._url_at_pos(event.pos())
+                if url:
+                    self.linkActivated.emit(url)
+
+    def insertFromMimeData(self, source) -> None:
+        """Insert external clipboard text cleanly without importing foreign webpage CSS backgrounds or font sizes."""
+        if source.hasText():
+            self.insertPlainText(source.text())
+        else:
+            super().insertFromMimeData(source)
 
 
 class SchedulerBridge(QObject):
@@ -241,7 +366,7 @@ class TimerRendezVousWidget(QWidget):
 
         parent_layout.addWidget(deck_frame)
 
-    # ── 6-Tab Section (1=Timers, 2=RDV, 3=Activity, 4=Scratchpad, 5=History, 6=Settings) ─
+    # ── 7-Tab Section (1=Timers, 2=RDV, 3=Activity, 4=Scratchpad, 5=Go, 6=History, 7=Settings) ─
 
     def _build_tabs(self, parent_layout: QVBoxLayout) -> None:
         self.tabs = QTabWidget()
@@ -262,15 +387,27 @@ class TimerRendezVousWidget(QWidget):
         self._init_scratchpad_tab(tab_scratchpad)
         self.tabs.addTab(tab_scratchpad, "4. Scratchpad 📝")
 
+        self.go_tab = GoTroubleshootingTab(self)
+        self.go_tab.diagnostic_completed.connect(self._on_go_diagnostic_completed)
+        self.go_tab.sendToScratchpad.connect(self._append_to_scratchpad)
+        self.tabs.addTab(self.go_tab, "5. Go ⏱️")
+
         tab_history = QWidget()
         self._init_history_tab(tab_history)
-        self.tabs.addTab(tab_history, "5. History 📜")
+        self.tabs.addTab(tab_history, "6. History 📜")
 
         tab_settings = QWidget()
         self._init_settings_tab(tab_settings)
-        self.tabs.addTab(tab_settings, "6. Settings ⚙️")
+        self.tabs.addTab(tab_settings, "7. Settings ⚙️")
 
+        self.tabs.currentChanged.connect(self._on_main_tab_changed)
         parent_layout.addWidget(self.tabs, 2)
+
+    def _on_main_tab_changed(self, _index: int) -> None:
+        """Hide the bottom Active Reminders Queue only on '5. Go ⏱️' so its console expands to full height."""
+        if hasattr(self, "active_queue_group"):
+            is_go_tab = self.tabs.currentWidget() is self.go_tab
+            self.active_queue_group.setVisible(not is_go_tab)
 
     # ── Tab 1: Professional Timer ────────────────────────────────────────────
 
@@ -577,7 +714,8 @@ class TimerRendezVousWidget(QWidget):
         layout.setSpacing(6)
 
         toolbar = QHBoxLayout()
-        lbl_sp = QLabel("📝 Time Notes Scratchpad")
+        toolbar.setSpacing(5)
+        lbl_sp = QLabel("📝 Time Notes")
         lbl_sp.setStyleSheet(f"color: {COLORS['accent']}; font-weight: bold;")
         toolbar.addWidget(lbl_sp)
 
@@ -587,8 +725,21 @@ class TimerRendezVousWidget(QWidget):
         toolbar.addWidget(self.lbl_scratchpad_status)
         toolbar.addStretch()
 
-        btn_stamp = QPushButton("🕒 +Timestamp (Ctrl+T)")
+        self.btn_scratchpad_bold = QPushButton("𝐁 Bold")
+        self.btn_scratchpad_bold.setToolTip("Toggle bold on highlighted text (Ctrl+B)")
+        self.btn_scratchpad_bold.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_scratchpad_bold.clicked.connect(self._toggle_scratchpad_bold)
+        toolbar.addWidget(self.btn_scratchpad_bold)
+
+        self.btn_scratchpad_color = QPushButton("🎨 Color")
+        self.btn_scratchpad_color.setToolTip("Change color of highlighted text")
+        self.btn_scratchpad_color.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_scratchpad_color.clicked.connect(self._show_scratchpad_color_menu)
+        toolbar.addWidget(self.btn_scratchpad_color)
+
+        btn_stamp = QPushButton("🕒 +Timestamp")
         btn_stamp.setObjectName("primaryBtn")
+        btn_stamp.setToolTip("Insert current timestamp (Ctrl+T)")
         btn_stamp.setCursor(Qt.CursorShape.PointingHandCursor)
         btn_stamp.clicked.connect(self._insert_scratchpad_timestamp)
         toolbar.addWidget(btn_stamp)
@@ -606,19 +757,25 @@ class TimerRendezVousWidget(QWidget):
 
         layout.addLayout(toolbar)
 
-        self.scratchpad_text = QPlainTextEdit()
+        self.scratchpad_text = ScratchpadEditor(self)
         self.scratchpad_text.setPlaceholderText(
-            "Jot down quick time notes, client names, ticket numbers, or call timestamps here...\n"
-            "Press Ctrl+T to insert the current timestamp."
+            "Jot down quick time notes, client names, ticket numbers, or web links here...\n"
+            "Highlight text and click '𝐁 Bold' (Ctrl+B) or '🎨 Color' to format. Click any web link to open it in your browser."
         )
         self.scratchpad_text.setStyleSheet("font-family: 'Consolas', monospace; font-size: 12px;")
-        if self.scratchpad_state.content:
+        if self.scratchpad_state.html and self.scratchpad_state.content:
+            self.scratchpad_text.setHtml(self.scratchpad_state.html)
+        elif self.scratchpad_state.content:
             self.scratchpad_text.setPlainText(self.scratchpad_state.content)
         self.scratchpad_text.textChanged.connect(self._on_scratchpad_modified)
+        self.scratchpad_text.linkActivated.connect(self._on_scratchpad_link_clicked)
         layout.addWidget(self.scratchpad_text, 1)
 
         shortcut_ts = QShortcut(QKeySequence("Ctrl+T"), self.scratchpad_text)
         shortcut_ts.activated.connect(self._insert_scratchpad_timestamp)
+
+        shortcut_bold = QShortcut(QKeySequence("Ctrl+B"), self.scratchpad_text)
+        shortcut_bold.activated.connect(self._toggle_scratchpad_bold)
 
     # ── Tab 5: Completed / Triggered History ─────────────────────────────────
 
@@ -780,11 +937,11 @@ class TimerRendezVousWidget(QWidget):
         layout.addWidget(s_group)
         layout.addStretch()
 
-    # ── Bottom Active Queue (Visible Across All 6 Tabs, Tall Multi-Row View) ─
+    # ── Bottom Active Queue (Visible Across Tabs 1–4, 6–7; Hidden on 5. Go) ──
 
     def _build_active_queue(self, parent_layout: QVBoxLayout) -> None:
-        q_group = QGroupBox("Active Reminders Queue")
-        q_layout = QVBoxLayout(q_group)
+        self.active_queue_group = QGroupBox("Active Reminders Queue")
+        q_layout = QVBoxLayout(self.active_queue_group)
         q_layout.setContentsMargins(8, 6, 8, 6)
         q_layout.setSpacing(4)
 
@@ -810,7 +967,7 @@ class TimerRendezVousWidget(QWidget):
         self.listbox.setMinimumHeight(155)
         q_layout.addWidget(self.listbox, 1)
 
-        parent_layout.addWidget(q_group, 3)
+        parent_layout.addWidget(self.active_queue_group, 3)
 
     # ── Action Slots & Backend Wiring ────────────────────────────────────────
 
@@ -1013,6 +1170,52 @@ class TimerRendezVousWidget(QWidget):
 
     # ── Scratchpad Actions ───────────────────────────────────────────────────
 
+    def _toggle_scratchpad_bold(self) -> None:
+        cursor = self.scratchpad_text.textCursor()
+        current_weight = cursor.charFormat().fontWeight()
+        is_bold = current_weight >= QFont.Weight.Bold
+        fmt = QTextCharFormat()
+        fmt.setFontWeight(QFont.Weight.Normal if is_bold else QFont.Weight.Bold)
+        cursor.mergeCharFormat(fmt)
+        self.scratchpad_text.mergeCurrentCharFormat(fmt)
+        self.scratchpad_text.setFocus()
+        self._save_scratchpad_now()
+
+    def _show_scratchpad_color_menu(self) -> None:
+        menu = QMenu(self)
+        menu.setStyleSheet(DARK_QSS)
+        for label, hex_val in SCRATCHPAD_TEXT_COLORS:
+            pix = QPixmap(12, 12)
+            pix.fill(QColor(hex_val))
+            action = menu.addAction(QIcon(pix), label)
+            action.triggered.connect(lambda _c=False, hx=hex_val: self._apply_scratchpad_color(hx))
+        menu.addSeparator()
+        custom_act = menu.addAction("🎨 Custom Color...")
+        custom_act.triggered.connect(self._pick_custom_scratchpad_color)
+        menu.exec(self.btn_scratchpad_color.mapToGlobal(QPoint(0, self.btn_scratchpad_color.height() + 2)))
+
+    def _pick_custom_scratchpad_color(self) -> None:
+        initial = self.scratchpad_text.textCursor().charFormat().foreground().color()
+        if not initial.isValid() or initial.name().lower() == "#000000":
+            initial = QColor(COLORS["accent"])
+        chosen = QColorDialog.getColor(initial, self, "Select Highlighted Text Color")
+        if chosen.isValid():
+            self._apply_scratchpad_color(chosen.name())
+
+    def _apply_scratchpad_color(self, hex_color: str) -> None:
+        cursor = self.scratchpad_text.textCursor()
+        fmt = QTextCharFormat()
+        fmt.setForeground(QColor(hex_color))
+        cursor.mergeCharFormat(fmt)
+        self.scratchpad_text.mergeCurrentCharFormat(fmt)
+        self.scratchpad_text.setFocus()
+        self._save_scratchpad_now()
+
+    def _on_scratchpad_link_clicked(self, raw_url: str) -> None:
+        if open_attachment_link(raw_url):
+            self.lbl_scratchpad_status.setText(f"🔗 Opened {normalize_link_target(raw_url)}")
+            self.lbl_scratchpad_status.setStyleSheet(f"color: {COLORS['accent_link']}; font-size: 11px;")
+
     def _insert_scratchpad_timestamp(self) -> None:
         stamp = datetime.datetime.now().strftime("[%Y-%m-%d %H:%M:%S] ")
         self.scratchpad_text.insertPlainText(stamp)
@@ -1044,11 +1247,57 @@ class TimerRendezVousWidget(QWidget):
 
     def _save_scratchpad_now(self) -> None:
         now_stamp = datetime.datetime.now().strftime("%H:%M:%S")
-        self.scratchpad_state.content = self.scratchpad_text.toPlainText()
+        plain = self.scratchpad_text.toPlainText()
+        self.scratchpad_state.content = plain
+        self.scratchpad_state.html = self.scratchpad_text.toHtml() if plain.strip() else ""
         self.scratchpad_state.updated_at = now_stamp
         Storage.save_scratchpad(self.scratchpad_state)
         self.lbl_scratchpad_status.setText(f"Saved {now_stamp}")
         self.lbl_scratchpad_status.setStyleSheet(f"color: {COLORS['text_muted']}; font-size: 11px;")
+
+    def _append_to_scratchpad(self, text: str) -> None:
+        cleaned = text.strip()
+        if not cleaned:
+            return
+        cursor = self.scratchpad_text.textCursor()
+        cursor.movePosition(QTextCursor.MoveOperation.End)
+        if self.scratchpad_text.toPlainText().strip():
+            cursor.insertText("\n\n")
+
+        header_fmt = QTextCharFormat()
+        header_fmt.setForeground(QColor(COLORS["accent_link"]))
+        header_fmt.setFontWeight(QFont.Weight.Bold)
+        stamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        cursor.insertText(f"[{stamp}] — Go Diagnostic Output:\n", header_fmt)
+
+        body_fmt = QTextCharFormat()
+        body_fmt.setForeground(QColor(COLORS["text"]))
+        body_fmt.setFontWeight(QFont.Weight.Normal)
+        cursor.insertText(f"{cleaned}\n", body_fmt)
+
+        self.scratchpad_text.setTextCursor(cursor)
+        sb = self.scratchpad_text.verticalScrollBar()
+        sb.setValue(sb.maximum())
+        self._save_scratchpad_now()
+
+    def _on_go_diagnostic_completed(self, payload: dict) -> None:
+        action = str(payload.get("action", "diag"))
+        target = str(payload.get("target", ""))
+        success = bool(payload.get("success", False))
+        status_label = "Diag PASS" if success else "Diag FAIL"
+        out_summary = str(payload.get("output", "") or "").splitlines()
+        first_line = out_summary[-1] if out_summary else ""
+        Storage.add_history_entry(
+            HistoryEntry(
+                name=f"[Go:{action}] {target}",
+                kind="diagnostic",
+                category="💼 Work",
+                completed_at=datetime.datetime.now().strftime("%b %d, %H:%M:%S"),
+                status=status_label,
+                note=first_line[:140],
+            )
+        )
+        self._load_history_list()
 
     # ── Activity & History Helpers ───────────────────────────────────────────
 
@@ -1594,7 +1843,9 @@ class MainApp(QMainWindow):
         if start_minimized:
             self.hide()
         else:
-            self.show()
+            self.showNormal()
+            self.raise_()
+            self.activateWindow()
 
     def _update_tray_tooltip(self) -> None:
         nearest = self.module_widget.scheduler.get_nearest_item()
