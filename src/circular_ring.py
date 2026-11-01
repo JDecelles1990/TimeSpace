@@ -1,75 +1,30 @@
-"""Radial Circular Progress Ring for countdown visualization drawn with Tkinter Canvas."""
+"""Radial Circular Progress Ring for countdown visualization drawn with PySide6 QPainter."""
 import math
-import tkinter as tk
-from src.config import COLORS, FONT_FAMILY
+from typing import Optional
+from PySide6.QtCore import Qt, QRectF
+from PySide6.QtGui import QPainter, QPen, QColor, QFont
+from PySide6.QtWidgets import QWidget
+from src.config import COLORS, FONT_FAMILY, UI_DIMENSIONS
 
-class CircularProgressRing(tk.Frame):
-    def __init__(self, parent, size: int = 210, ring_width: int = 10, **kwargs):
-        super().__init__(parent, bg=COLORS["bg_dark"], **kwargs)
-        self.size = size
+
+class CircularProgressRing(QWidget):
+    def __init__(
+        self,
+        parent: Optional[QWidget] = None,
+        size: int = UI_DIMENSIONS["ring_size"],
+        ring_width: int = UI_DIMENSIONS["ring_width"],
+    ):
+        super().__init__(parent)
+        self.size_px = size
         self.ring_width = ring_width
-        self.padding = 16
+        self.setFixedSize(self.size_px, self.size_px)
 
-        self.canvas = tk.Canvas(
-            self,
-            width=self.size,
-            height=self.size,
-            bg=COLORS["bg_dark"],
-            highlightthickness=0
-        )
-        self.canvas.pack(anchor="center", pady=4)
-
-        self._draw_static()
-
-    def _get_coords(self):
-        p = self.padding
-        return p, p, self.size - p, self.size - p
-
-    def _draw_static(self):
-        self.canvas.delete("all")
-        x0, y0, x1, y1 = self._get_coords()
-
-        # Background track arc (full 360 circle)
-        self.canvas.create_oval(
-            x0, y0, x1, y1,
-            outline=COLORS["surface"],
-            width=self.ring_width
-        )
-
-        # Active progress arc
-        self.arc_item = self.canvas.create_arc(
-            x0, y0, x1, y1,
-            start=90,
-            extent=360,
-            outline=COLORS["accent"],
-            width=self.ring_width,
-            style=tk.ARC
-        )
-
-        # Center typography
-        center_x = self.size / 2
-        center_y = self.size / 2
-
-        self.text_time = self.canvas.create_text(
-            center_x, center_y - 10,
-            text="00:00",
-            font=(FONT_FAMILY, 24, "bold"),
-            fill=COLORS["text"]
-        )
-
-        self.text_title = self.canvas.create_text(
-            center_x, center_y + 22,
-            text="Ready",
-            font=(FONT_FAMILY, 9),
-            fill=COLORS["text_muted"]
-        )
-
-        self.text_badge = self.canvas.create_text(
-            center_x, center_y + 38,
-            text="",
-            font=(FONT_FAMILY, 8, "bold"),
-            fill=COLORS["accent_warning"]
-        )
+        self._ratio: float = 0.0
+        self._arc_color: str = COLORS["surface_light"]
+        self._time_text: str = "--:--"
+        self._title_text: str = "All Quiet"
+        self._badge_text: str = ""
+        self._badge_color: str = COLORS["accent_warning"]
 
     def update_countdown(
         self,
@@ -77,56 +32,91 @@ class CircularProgressRing(tk.Frame):
         total_sec: float,
         title: str = "",
         is_repeating: bool = False,
-        is_paused: bool = False
-    ):
+        is_paused: bool = False,
+    ) -> None:
         """Update the arc progress and central time readout."""
         remaining_sec = max(0.0, remaining_sec)
         total_sec = max(1.0, total_sec)
 
-        ratio = min(1.0, remaining_sec / total_sec)
-        extent = ratio * 359.9
+        self._ratio = min(1.0, remaining_sec / total_sec)
 
-        # Color changes dynamically or shows paused
         if is_paused:
-            arc_color = COLORS["surface_light"]
-        elif ratio < 0.10:
-            arc_color = COLORS["accent_danger"]
-        elif ratio < 0.25:
-            arc_color = COLORS["accent_warning"]
+            self._arc_color = COLORS["surface_light"]
+        elif self._ratio < 0.10:
+            self._arc_color = COLORS["accent_danger"]
+        elif self._ratio < 0.25:
+            self._arc_color = COLORS["accent_warning"]
         else:
-            arc_color = COLORS["accent"]
+            self._arc_color = COLORS["accent"]
 
-        # Update arc
-        self.canvas.itemconfig(self.arc_item, extent=-extent, outline=arc_color)
-
-        # Format time digits
         total_int = int(math.ceil(remaining_sec))
         m, s = divmod(total_int, 60)
         h, m = divmod(m, 60)
-        if h > 0:
-            time_str = f"{h:02d}:{m:02d}:{s:02d}"
-        else:
-            time_str = f"{m:02d}:{s:02d}"
+        self._time_text = f"{h:02d}:{m:02d}:{s:02d}" if h > 0 else f"{m:02d}:{s:02d}"
 
-        self.canvas.itemconfig(self.text_time, text=time_str)
-        truncated_title = title if len(title) <= 20 else title[:18] + "…"
-        self.canvas.itemconfig(self.text_title, text=truncated_title or "Countdown")
+        truncated = title if len(title) <= 14 else title[:12] + "…"
+        self._title_text = truncated or "Countdown"
 
         if is_paused:
-            badge_text = "⏸️ PAUSED"
-            badge_color = COLORS["accent_warning"]
+            self._badge_text = "⏸ PAUSED"
+            self._badge_color = COLORS["accent_warning"]
         elif is_repeating:
-            badge_text = "🔁 Repeat"
-            badge_color = COLORS["accent_success"]
+            self._badge_text = "🔁 Repeat"
+            self._badge_color = COLORS["accent_success"]
         else:
-            badge_text = ""
-            badge_color = COLORS["accent_warning"]
+            self._badge_text = ""
 
-        self.canvas.itemconfig(self.text_badge, text=badge_text, fill=badge_color)
+        self.update()
 
-    def set_idle(self):
+    def set_idle(self) -> None:
         """Reset ring to calm waiting state."""
-        self.canvas.itemconfig(self.arc_item, extent=0, outline=COLORS["surface_light"])
-        self.canvas.itemconfig(self.text_time, text="--:--")
-        self.canvas.itemconfig(self.text_title, text="No active timer")
-        self.canvas.itemconfig(self.text_badge, text="")
+        self._ratio = 0.0
+        self._arc_color = COLORS["surface_light"]
+        self._time_text = "--:--"
+        self._title_text = "All Quiet"
+        self._badge_text = ""
+        self.update()
+
+    def paintEvent(self, _event) -> None:
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+
+        pad = self.ring_width + 4
+        rect = QRectF(pad, pad, self.size_px - 2 * pad, self.size_px - 2 * pad)
+
+        # Track circle
+        track_pen = QPen(QColor(COLORS["surface"]), self.ring_width)
+        track_pen.setCapStyle(Qt.PenCapStyle.RoundCap)
+        painter.setPen(track_pen)
+        painter.drawEllipse(rect)
+
+        # Progress arc (clockwise from 12 o'clock = 90 * 16)
+        if self._ratio > 0.001:
+            arc_pen = QPen(QColor(self._arc_color), self.ring_width)
+            arc_pen.setCapStyle(Qt.PenCapStyle.RoundCap)
+            painter.setPen(arc_pen)
+            start_angle = 90 * 16
+            span_angle = -int(self._ratio * 360 * 16)
+            painter.drawArc(rect, start_angle, span_angle)
+
+        # Time readout
+        painter.setPen(QColor(COLORS["text"]))
+        time_font = QFont(FONT_FAMILY, max(12, int(self.size_px * 0.13)), QFont.Weight.Bold)
+        painter.setFont(time_font)
+        time_rect = QRectF(0, self.size_px * 0.26, self.size_px, 28)
+        painter.drawText(time_rect, Qt.AlignmentFlag.AlignCenter, self._time_text)
+
+        # Title readout
+        painter.setPen(QColor(COLORS["text_muted"]))
+        title_font = QFont(FONT_FAMILY, 8)
+        painter.setFont(title_font)
+        title_rect = QRectF(8, self.size_px * 0.52, self.size_px - 16, 18)
+        painter.drawText(title_rect, Qt.AlignmentFlag.AlignCenter, self._title_text)
+
+        # Badge readout
+        if self._badge_text:
+            painter.setPen(QColor(self._badge_color))
+            badge_font = QFont(FONT_FAMILY, 7, QFont.Weight.Bold)
+            painter.setFont(badge_font)
+            badge_rect = QRectF(8, self.size_px * 0.67, self.size_px - 16, 16)
+            painter.drawText(badge_rect, Qt.AlignmentFlag.AlignCenter, self._badge_text)

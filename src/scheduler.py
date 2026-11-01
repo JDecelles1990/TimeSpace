@@ -1,95 +1,90 @@
-"""Thread-safe Timer & Rendez-vous scheduler with pause/resume, categories, and repeating rules."""
+"""Thread-safe Timer & Rendez-vous scheduler with pause/resume, categories, attachments, and repeating rules."""
 import time
 import uuid
+import calendar
 import datetime
 import threading
-from typing import List, Callable, Dict, Any, Optional
+from dataclasses import dataclass, asdict, replace
+from typing import List, Callable, Dict, Any, Optional, Set
 from src.storage import Storage
 
+
+@dataclass
 class ScheduledItem:
-    def __init__(
-        self,
-        item_id: str,
-        kind: str,
-        name: str,
-        target_time: float,
-        repeat_sec: int = 0,
-        original_duration: float = 0.0,
-        repeat_rule: str = "none",
-        is_paused: bool = False,
-        remaining_paused: float = 0.0,
-        category: str = "General",
-        lead_time_min: int = 0
-    ):
-        self.id = item_id
-        self.kind = kind  # 'timer' or 'rendez-vous'
-        self.name = name
-        self.target_time = target_time
-        self.repeat_sec = repeat_sec
-        self.original_duration = original_duration or (target_time - time.time())
-        self.repeat_rule = repeat_rule  # "none", "daily", "weekly", "monthly"
-        self.is_paused = is_paused
-        self.remaining_paused = remaining_paused
-        self.category = category
-        self.lead_time_min = lead_time_min
+    id: str
+    kind: str  # 'timer' or 'rendez-vous'
+    name: str
+    target_time: float
+    repeat_sec: int = 0
+    original_duration: float = 0.0
+    repeat_rule: str = "none"  # "none", "daily", "weekly", "monthly"
+    is_paused: bool = False
+    remaining_paused: float = 0.0
+    category: str = "General"
+    lead_time_min: int = 0
+    url: str = ""
+    note: str = ""
+    anchor_day: int = 0
+
+    def __post_init__(self) -> None:
+        if not self.original_duration or self.original_duration <= 0:
+            self.original_duration = max(1.0, self.target_time - time.time())
 
     def to_dict(self) -> Dict[str, Any]:
-        return {
-            "id": self.id,
-            "kind": self.kind,
-            "name": self.name,
-            "target_time": self.target_time,
-            "repeat_sec": self.repeat_sec,
-            "original_duration": self.original_duration,
-            "repeat_rule": self.repeat_rule,
-            "is_paused": self.is_paused,
-            "remaining_paused": self.remaining_paused,
-            "category": self.category,
-            "lead_time_min": self.lead_time_min
-        }
+        return asdict(self)
 
-    @staticmethod
-    def from_dict(d: dict):
-        return ScheduledItem(
-            item_id=d["id"],
-            kind=d["kind"],
-            name=d["name"],
-            target_time=d["target_time"],
-            repeat_sec=d.get("repeat_sec", 0),
-            original_duration=d.get("original_duration", 0.0),
+    @classmethod
+    def from_dict(cls, d: Dict[str, Any]) -> "ScheduledItem":
+        return cls(
+            id=d.get("id", str(uuid.uuid4())),
+            kind=d.get("kind", "timer"),
+            name=d.get("name", "Reminder"),
+            target_time=float(d.get("target_time", time.time())),
+            repeat_sec=int(d.get("repeat_sec", 0)),
+            original_duration=float(d.get("original_duration", 0.0)),
             repeat_rule=d.get("repeat_rule", "none"),
-            is_paused=d.get("is_paused", False),
-            remaining_paused=d.get("remaining_paused", 0.0),
+            is_paused=bool(d.get("is_paused", False)),
+            remaining_paused=float(d.get("remaining_paused", 0.0)),
             category=d.get("category", "General"),
-            lead_time_min=d.get("lead_time_min", 0)
+            lead_time_min=int(d.get("lead_time_min", 0)),
+            url=str(d.get("url", "") or ""),
+            note=str(d.get("note", "") or ""),
+            anchor_day=int(d.get("anchor_day", 0) or 0),
         )
+
 
 class ReminderScheduler:
     def __init__(
         self,
         on_trigger_callback: Callable[[ScheduledItem], None],
-        on_wake_missed_callback: Optional[Callable[[List[ScheduledItem]], None]] = None
+        on_wake_missed_callback: Optional[Callable[[List[ScheduledItem]], None]] = None,
     ):
         self.items: List[ScheduledItem] = []
         self.missed_items: List[ScheduledItem] = []
         self.callback = on_trigger_callback
         self.on_wake_missed_callback = on_wake_missed_callback
-        self._running = True
+        self._running: bool = True
         self._lock = threading.Lock()
 
-        # Load persisted reminders and detect any missed alarms while closed
         now = time.time()
+        dirty = False
         for item_data in Storage.load_reminders():
             it = ScheduledItem.from_dict(item_data)
             if not it.is_paused and it.target_time < now - 10:
-                self.missed_items.append(it)
+                self.missed_items.append(replace(it))
+                if self._advance_repeat(it, now):
+                    self.items.append(it)
+                dirty = True
             else:
                 self.items.append(it)
+
+        if dirty:
+            self._persist()
 
         self._worker = threading.Thread(target=self._run_loop, daemon=True)
         self._worker.start()
 
-    def _persist(self):
+    def _persist(self) -> None:
         Storage.save_reminders([it.to_dict() for it in self.items])
 
     def add_item(
@@ -101,20 +96,28 @@ class ReminderScheduler:
         original_duration: float = 0.0,
         repeat_rule: str = "none",
         category: str = "General",
-        lead_time_min: int = 0
+        lead_time_min: int = 0,
+        url: str = "",
+        note: str = "",
+        anchor_day: int = 0,
     ) -> str:
         item_id = str(uuid.uuid4())
-        # If an early reminder lead-time is specified, advance alarm
+        now_ts = time.time()
+        intended_event_ts = now_ts + seconds_from_now
         effective_seconds = max(0.0, seconds_from_now - (lead_time_min * 60))
-        target = time.time() + effective_seconds
-        dur = original_duration if original_duration > 0 else seconds_from_now
+        target = now_ts + effective_seconds
+        dur = original_duration if original_duration > 0 else max(1.0, effective_seconds)
 
         annotated_name = name or "Untitled Reminder"
-        if lead_time_min > 0:
+        if lead_time_min > 0 and not annotated_name.startswith(f"[{lead_time_min}m Early]"):
             annotated_name = f"[{lead_time_min}m Early] {annotated_name}"
 
+        computed_anchor = anchor_day
+        if computed_anchor <= 0 and repeat_rule.lower() == "monthly":
+            computed_anchor = datetime.datetime.fromtimestamp(intended_event_ts).day
+
         item = ScheduledItem(
-            item_id=item_id,
+            id=item_id,
             kind=kind,
             name=annotated_name,
             target_time=target,
@@ -122,14 +125,17 @@ class ReminderScheduler:
             original_duration=dur,
             repeat_rule=repeat_rule,
             category=category,
-            lead_time_min=lead_time_min
+            lead_time_min=lead_time_min,
+            url=url.strip(),
+            note=note.strip(),
+            anchor_day=computed_anchor,
         )
         with self._lock:
             self.items.append(item)
             self._persist()
         return item_id
 
-    def remove_item(self, item_id: str):
+    def remove_item(self, item_id: str) -> None:
         with self._lock:
             self.items = [it for it in self.items if it.id != item_id]
             self._persist()
@@ -169,42 +175,65 @@ class ReminderScheduler:
 
     def get_events_for_date(self, target_date: datetime.date) -> List[ScheduledItem]:
         """Return all scheduled rendez-vous falling on a specific calendar date."""
-        matching = []
+        matching: List[ScheduledItem] = []
         with self._lock:
             for it in self.items:
                 if it.kind == "rendez-vous":
-                    item_date = datetime.datetime.fromtimestamp(it.target_time).date()
+                    event_ts = it.target_time + max(0, it.lead_time_min) * 60
+                    item_date = datetime.datetime.fromtimestamp(event_ts).date()
                     if item_date == target_date:
                         matching.append(it)
         return matching
 
-    def get_all_event_dates(self) -> set:
+    def get_all_event_dates(self) -> Set[datetime.date]:
         """Return a set of datetime.date objects that currently have scheduled rendez-vous."""
-        dates = set()
+        dates: Set[datetime.date] = set()
         with self._lock:
             for it in self.items:
                 if it.kind == "rendez-vous":
-                    d = datetime.datetime.fromtimestamp(it.target_time).date()
+                    event_ts = it.target_time + max(0, it.lead_time_min) * 60
+                    d = datetime.datetime.fromtimestamp(event_ts).date()
                     dates.add(d)
         return dates
 
-    def _advance_repeat(self, it: ScheduledItem, now: float):
+    def _advance_repeat(self, it: ScheduledItem, now: float) -> bool:
+        """Advance a repeating timer or calendar RDV past `now`, preserving anchored monthly days and DST wall-clock."""
         if it.repeat_sec > 0:
             it.target_time = now + it.repeat_sec
+            it.original_duration = float(it.repeat_sec)
             return True
-        rule = it.repeat_rule.lower()
-        if rule == "daily":
-            it.target_time += 86400
-            return True
-        elif rule == "weekly":
-            it.target_time += 86400 * 7
-            return True
-        elif rule == "monthly":
-            it.target_time += 86400 * 30
-            return True
-        return False
 
-    def _run_loop(self):
+        rule = (it.repeat_rule or "none").lower()
+        if rule not in ("daily", "weekly", "monthly"):
+            return False
+
+        lead_delta = datetime.timedelta(minutes=max(0, it.lead_time_min))
+        event_dt = datetime.datetime.fromtimestamp(it.target_time) + lead_delta
+
+        if rule == "monthly" and it.anchor_day <= 0:
+            it.anchor_day = event_dt.day
+
+        while True:
+            if rule == "daily":
+                next_date = event_dt.date() + datetime.timedelta(days=1)
+                event_dt = datetime.datetime.combine(next_date, event_dt.time())
+            elif rule == "weekly":
+                next_date = event_dt.date() + datetime.timedelta(days=7)
+                event_dt = datetime.datetime.combine(next_date, event_dt.time())
+            elif rule == "monthly":
+                year = event_dt.year + (event_dt.month // 12)
+                month = (event_dt.month % 12) + 1
+                max_day = calendar.monthrange(year, month)[1]
+                day = min(it.anchor_day, max_day)
+                event_dt = event_dt.replace(year=year, month=month, day=day)
+
+            next_trigger_ts = (event_dt - lead_delta).timestamp()
+            if next_trigger_ts > now:
+                it.target_time = next_trigger_ts
+                it.original_duration = max(1.0, next_trigger_ts - now)
+                return True
+
+    def _run_loop(self) -> None:
         last_tick = time.time()
         while self._running:
             time.sleep(0.5)
@@ -212,26 +241,26 @@ class ReminderScheduler:
 
             gap = now - last_tick
             if gap > 6.0:
-                missed_during_sleep = []
+                missed_during_sleep: List[ScheduledItem] = []
                 with self._lock:
                     for it in self.items:
                         if not it.is_paused and it.target_time < now:
-                            missed_during_sleep.append(it)
+                            missed_during_sleep.append(replace(it))
                 if missed_during_sleep and self.on_wake_missed_callback:
                     self.on_wake_missed_callback(missed_during_sleep)
 
             last_tick = now
-            triggered = []
+            triggered: List[ScheduledItem] = []
 
             with self._lock:
-                remaining = []
+                remaining: List[ScheduledItem] = []
                 for it in self.items:
                     if it.is_paused:
                         remaining.append(it)
                         continue
 
                     if now >= it.target_time:
-                        triggered.append(it)
+                        triggered.append(replace(it))
                         if self._advance_repeat(it, now):
                             remaining.append(it)
                     else:

@@ -1,132 +1,85 @@
-# User Guide - Timer & Rendez-vous ⏰
+# User Guide — Timer & Rendez-vous (`Docs/USER_GUIDE.md`)
 
-Welcome to **Timer & Rendez-vous**! This guide details all features, controls, and shortcuts.
-
----
-
-## ⚡ Quick Natural Language Input Bar
-At the top of the window, schedule timers and appointments in plain English:
-- **`Ring in 15 min`** -> Starts a 15-minute countdown alert.
-- **`RDV at 4PM`** -> Schedules a rendez-vous appointment at 16:00 today (or tomorrow if 16:00 has already passed).
-- **`Call Linda at 7:15 tomorrow morning`** -> Schedules a morning rendez-vous for tomorrow at 07:15.
-- **`Call Linda at 7:15 tomorrow evening`** -> Schedules an evening rendez-vous for tomorrow at 19:15.
-- **`Check oven in 25 mins`** -> Creates a 25-minute timer named *"Check oven"*.
-- **`Remind me in 10 minutes to call John`** -> 10-minute timer named *"call John"*.
-- **`Timer for 30m meditation`** -> 30-minute timer named *"meditation"*.
-- **`RDV tomorrow at 10am dentist`** -> Schedules a dentist appointment for tomorrow at 10:00.
-- **`at 8 tonight netflix`** -> Schedules for tonight at 20:00.
-- **`Call Sam in 2 days`** -> Rendez-vous in 2 days at noon (12:00).
-- **`Call Sam in 2 days at 3pm`** -> Rendez-vous in 2 days at 15:00.
-- **`Doctor in 1 week`** -> Rendez-vous in 7 days at noon.
-- **`Doctor in 1 week at 10am`** -> Rendez-vous in 7 days at 10:00.
-- **`Dentist next Friday`** -> Rendez-vous on the next coming Friday at noon.
-- **`Dentist next Friday at 14:00`** -> Rendez-vous on the next coming Friday at 14:00.
-- **`Meeting on Wednesday at 3pm`** -> Rendez-vous on the next Wednesday at 15:00.
-
-Press **Enter** or click **Create ⚡**.
+> **Canonical Scope**: End-user operational manual covering all controls, the 6 module tabs, natural-language scheduling grammar, notifications, Floating Mini HUD, and keyboard shortcuts.
+> *(For technical architecture and F7Hub embedding, see [ARCHITECTURE.md](ARCHITECTURE.md). For file/state schemas, see [STATE_AND_CONFIG.md](STATE_AND_CONFIG.md).)*
 
 ---
 
-## ⭕ Radial Circular Progress Ring & Controls
-- **Live Visual Ring**: Sweeps clockwise and depletes smoothly as elapsed time advances.
-- **Color Progression**: Indigo (>25%) ➔ Amber (<25%) ➔ Red (<10%).
-- **Playback Controls**:
-  - **`⏯️ Pause / Resume`**: Freeze the active countdown in place. The ring displays `⏸️ PAUSED`.
-  - **`⏹️ Stop`**: Clears the active countdown.
+## 1. Header & Hero Deck (Top Section)
+
+- **Header Bar**: Displays the application title, the **`📌 HUD: ON / OFF`** toggle button, and the active global hotkey badge (`CTRL+F7`).
+- **Left — ⭕ Radial Circular Progress Ring**:
+  - Smoothly depletes clockwise for your active timer (or nearest upcoming Rendez-vous when no timer is active).
+  - **Urgency Colors**: Indigo (`>25%` remaining) ➔ Amber (`<25%`) ➔ Crimson Red (`<10%`), with inline `⏸ PAUSED` and `🔁 Repeat` status badges.
+  - **`⏯ Pause / ▶ Resume`** & **`⏹ Stop`**: Directly pause/resume or cancel the active countdown.
+- **Right — ⚡ Quick Natural Schedule**:
+  - Type an everyday English expression and press **`Enter`** or click **`Create ⚡`**:
+
+| Input Category | Example Expressions | Result |
+|---|---|---|
+| **Countdown Timers** | `Ring in 15 min` · `Check backups in 45m` · `Remind me in 10 minutes to call John` · `Timer for 30m review` | Starts a countdown timer immediately |
+| **Same / Next Day RDV** | `RDV at 4PM` · `Call Linda at 7:15 tomorrow morning` · `at 18:30 dinner` · `at 8 tonight backup check` | Schedules a calendar Rendez-vous (auto-advances to tomorrow if today's time has passed) |
+| **Relative Days / Weeks** | `Call Sam in 2 days` · `Call Sam in 2 days at 3pm` · `Follow up in 1 week at 10am` | Schedules a Rendez-vous `N` days/weeks ahead (defaults to `12:00` if no time specified) |
+| **Next Weekday RDV** | `Dentist next Friday` · `Dentist next Friday at 14:00` · `Meeting on Wednesday at 3pm` | Schedules a Rendez-vous on the upcoming target weekday |
 
 ---
 
-## ⏳ Timers & Quick Presets
-- **Quick Presets**: Single click on **30 Minutes**, **1 Hour**, or **2 Hours**.
-- **🎫 IT Support & SLA Presets**: One-click timers tailored for helpdesk workflows:
-  - **`⚡ 15m SLA`**: P1 Critical Response countdown (`🚨 SLA Warning`).
-  - **`🚨 30m SLA`**: High priority ticket action window (`🚨 SLA Warning`).
-  - **`📞 45m Callback`**: Scheduled customer callback alert (`📞 Callback`).
-  - **`🔄 2h Follow-up`**: Ticket status check & follow-up reminder (`🔄 Follow-up`).
-  - **`🛠️ 4h Maint`**: System maintenance window countdown (`🛠️ Maintenance`).
-- **Custom Timer**: Enter task name, hours, minutes, seconds, check **Repeat automatically** if desired, and click **Start Timer**.
+## 2. The 6 Module Tabs
+
+### Tab 1 — `1. Timers ⏳` (Daily Task & Reminder Timer)
+- **⚡ Quick Start Presets**: One-click buttons for **`15 Minutes`**, **`30 Minutes`**, **`1 Hour`**, and **`2 Hours`**.
+  - *Tip*: Any text entered into **What to do**, **Client / Ticket #**, or **Link / Note** is automatically attached when you click a preset!
+- **⏱️ Daily Task & Reminder Timer**:
+  - **What to do**: Reminder description (e.g., `Check server backup`, `Call back`, `Send invoice`).
+  - **Client / Ticket #** *(Optional)*: Quick reference field for a client name or ticket number (e.g., `Acme Corp` or `#4821`). Automatically formats the reminder as `[Acme Corp] Check server backup` and tags it with `🎫 Ticket`.
+  - **Link / Note** *(Optional)*: Side-by-side compact inputs to attach a **Link / URL / File Path** (web URLs, bare domains like `teams.microsoft.com/...`, `mailto:`, or local Windows files/folders) and a **Short Note**.
+  - **Countdown & Repeat**: Set `h`, `min`, `sec`, optionally check **Repeat automatically**, and click **`Start Timer ▶`** (or press **`Enter`** in any text box).
+
+### Tab 2 — `2. RDV 📅` (Calendar & Appointments)
+- **📅 Calendar (Left Column)**:
+  - Navigate months with **`◀`** / **`▶`** or jump instantly with **`Today`**, **`Tmrw`**, **`Fri`**, and **`Mon`**.
+  - Dates with scheduled appointments display a dot (`•`); clicking any date previews its events in the Day Agenda bar below the grid.
+- **⏰ Appointment Details (Right Column)**:
+  - **Event / Client**: Subject, client name, or ticket reference.
+  - **Time Picker**: Adjust hours/minutes with **`+`** / **`−`** steppers, minute chips (`:00`, `:15`, `:30`, `:45`), or presets (`09:00`, `12:00`, `15:00`, `18:00`).
+  - **Link & Short Note** *(Optional)*: Attach a meeting link (Teams/Zoom/Meet), ticket URL, or local file/folder path plus a brief note—ready to launch in 1 click when the popup fires.
+  - **Category, Alert & Repeat**: Tag with a category (`📌 General`, `💼 Work`, `📞 Callback`, `🔄 Follow-up`, `🎫 Ticket`, `🩺 Health`, `🏠 Personal`), set an early lead-time (`At time (0m)`, `5m`, `10m`, or `15m before`), and optionally repeat (`None`, `Daily`, `Weekly`, `Monthly`—monthly RDVs anchor to your original day-of-month such as `Jan 31 → Feb 28/29 → Mar 31` and auto-advance if missed while closed).
+  - **`.ics` Import / Export**: Sync appointments (including `URL` and `DESCRIPTION` notes, plus embedded Teams/Zoom links from calendar invites) with Outlook, Google Calendar, or Apple Calendar.
+
+### Tab 3 — `3. Activity 📋` (Live Dual-Column Dashboard)
+- Full-height side-by-side lists for **`⏳ All Timers`** and **`📅 All Rendez-vous`** (~15+ visible rows per column).
+- Click any item to inspect its fire timestamp, category, lead-time, repeat rule, note, and link; act immediately with **`⏯ Pause/Resume`**, **`🗑️ Delete`**, or the contextual **`🔗 Open Link`** button (shown whenever the selected item has a link).
+
+### Tab 4 — `4. Scratchpad 📝` (Persistent Time Notes)
+- Monospace notepad for quick time notes, call logs, or client references, auto-saved continuously (`500ms` debounce) with live save status in the toolbar.
+- **`🕒 +Timestamp (Ctrl+T)`**: Inserts `[YYYY-MM-DD HH:MM:SS] ` at the cursor.
+- **`📋 Copy All`** / **`🧹 Clear`**: Copy the entire scratchpad to clipboard or clear after confirmation.
+
+### Tab 5 — `5. History 📜` (Completed & Triggered Log)
+- Dedicated full-height audit log recording every **`Triggered`**, **`Dismissed`**, **`Opened Link`**, and **`Snoozed`** reminder (up to the latest 100 entries).
+- **`🔗 Open Link`**: Appears automatically in the header when selecting a history entry with an attached URL/path.
+- **`📋 Copy Selected`**: Copies `[timestamp] Name (Status)` (plus any attached note and link) to the clipboard in one click.
+- **`🧹 Clear History`**: Empties the persisted history log.
+
+### Tab 6 — `6. Settings ⚙️` (Audio, Opacity & System Preferences)
+- **Alarm Tone & `🔊 Preview`**: Audition built-in synthesized patterns (*Gentle Chime*, *Digital Watch*, *Urgent Siren*) or **`Browse...`** for a custom `.mp3` / `.wav` file.
+- **Master Volume (`0–100%`)**: Hardware-scaled alarm loudness.
+- **Popup & HUD Opacity (`60–100%`, default `90%`)**: Controls transparency of the **Floating Mini HUD** and **Bottom-Right Alarm Popups** with live preview while dragging (keeping the Main Window `100%` solid).
+- **System Options**: Toggle **Gradual volume escalation**, **Launch at Windows boot** (starts minimized in tray), choose your **Default Snooze** (`5`, `10`, `15`, or `30` min), and click **`Save Settings ✓`**.
 
 ---
 
-## 📌 Floating Mini HUD (Compact Multi-Monitor Widget)
-Designed for IT support desks, NOC monitors, and multi-display setups:
-- **Always-on-Top & Borderless**: Minimalist translucent HUD pill (280x42px) floats unobtrusively over ticketing systems (Jira, ServiceNow, Zendesk).
-- **Draggable Anywhere**: Click and drag from any monitor; automatically remembers its position on screen for future launches.
-- **Urgency Color Coding**:
-  - `Indigo` (>5m): Normal operations.
-  - `Amber` (<5m): Approaching SLA or deadline.
-  - `Crimson Red` (<1m or overdue): Critical SLA breach alert with `🚨` warning icon.
-- **Embedded Controls**: Direct `⏯️` quick pause/resume button and `✕` close button. Double-click the HUD to immediately bring the full application to front.
-- **Toggle Options**: Toggle via the header button (`📌 Mini HUD: ON/OFF`) or from the System Tray right-click menu.
+## 3. Persistent Queue, Notifications, HUD & Shortcuts
 
----
+- **Active Reminders Queue (Bottom Panel)**: Always visible beneath all 6 tabs (7–9+ visible rows). Items highlight **Amber** under 5 minutes and **Crimson Red** under 1 minute, and display `🔗` / `📝` indicators (with hover tooltips) when links or notes are attached.
+- **Bottom-Right Alarm Popup**: Triggers as a compact frameless card above the Windows system tray (stacking vertically if multiple alarms fire) alongside a Windows Action Center toast—without forcing the main window open over your work. Displays any attached note and lets you click **`🔗 Open Link`** (which opens the URL/file, stops alarm audio, logs `Opened Link`, and dismisses the popup), **`✓ Dismiss`**, or **`💤 Snooze`** (`5m`/`10m`/`15m`/`30m`, preserving notes & links).
+- **Missed & Sleep-Wake Alerts**: Automatically notifies you on startup or PC wake-up if reminders elapsed while the app was closed or the PC was asleep.
+- **📌 Floating Mini HUD**: Draggable always-on-top desktop pill showing the nearest countdown with urgency border colors and quick pause (`⏯`). Double-click the HUD to bring the main window forward.
 
-## 📅 Rendez-vous Tab & Interactive Calendar
-- **Interactive Dark Calendar Grid**:
-  - Browse months using `◀` and `▶`. Week starts on **Sunday** and ends on **Saturday**.
-  - Click any day cell to select that date.
-  - Days with scheduled events feature a glowing dot (`•`).
-  - **Day Inspector**: Underneath the calendar, view appointments scheduled for the selected day.
-- **Quick Date Shortcuts**:
-  - Click `[ Today ]`, `[ Tomorrow ]`, `[ This Friday ]`, or `[ Next Monday ]` for instant selection.
-- **Big-Buttons Time Picker**:
-  - Large digital time display (`14 : 30`).
-  - Click `+` and `–` to adjust hours and minutes.
-  - Minute chips: click `[ :00 ]`, `[ :15 ]`, `[ :30 ]`, or `[ :45 ]`.
-  - Presets: click `🌅 09:00`, `☀️ 12:00`, `☕ 15:00`, or `🌙 18:00`.
-- **Early Warning Lead-Time**:
-  - Configure early reminders: `At time of event (0m)`, `5m before`, `10m before`, or `15m before`.
-- **Category Badges**:
-  - Tag events with `🎫 Ticket`, `🚨 SLA Warning`, `📞 Callback`, `🔄 Follow-up`, `🛠️ Maintenance`, `💼 Work`, `🩺 Health`, `🏠 Personal`, or `📌 General`.
-- **Repeating Rules**: Pick **None**, **Daily**, **Weekly**, or **Monthly**.
-- **Export / Import .ics**: Sync appointments with Microsoft Outlook, Google Calendar, or Apple Calendar.
-
----
-
-## 📋 Activity Tab
-A live dashboard showing all active and completed items, updated in real time:
-- **⏳ All Timers** (left column):
-  - Live countdown (`HH:MM:SS remaining`) for every active timer.
-  - `⏸️` badge for paused timers, `🔁` badge for repeating timers.
-  - **Detail card**: Click any timer to see its name, remaining time, scheduled fire time, repeat flag, and category.
-  - **⏯️ Pause/Resume**: Instantly pause or resume the selected timer.
-  - **🗑️ Delete**: Remove the selected timer permanently.
-- **📅 All Rendez-vous** (right column):
-  - Live countdown for every scheduled appointment.
-  - Category icon (`🎫 🚨 📞 🔄 🛠️ 💼 🩺 🏠`) and `🔁` repeat badge shown inline.
-  - **Detail card**: Click any event to see name, remaining time, date/time, repeat rule, category, and early-alert lead time.
-  - **🗑️ Delete**: Cancel the selected appointment.
-- **📜 Completed / Triggered History** (bottom section):
-  - In-app searchable audit log of finished and triggered events.
-  - Logs completion timestamp, final status (`Triggered`, `Completed / Dismissed`, `Snoozed 5m/15m`).
-  - Detail inspector displaying event category, duration, and completion details.
-  - **`🧹 Clear History`** button to flush past logs on demand.
-
----
-
-## ⚙️ Settings Tab
-- **Alarm Sound Pattern**:
-  - *Gentle Chime*: Melodic C-Major ascending arpeggio.
-  - *Digital Watch*: Crisp double chirp.
-  - *Urgent Siren*: Fast two-tone alternating alert.
-  - *Custom Audio*: Pick any `.mp3` or `.wav` file on your computer.
-- **Master Alarm Volume Slider**: Adjust loudness from `0%` to `100%` with true hardware/MCI volume scaling.
-- **🔊 Play Sound Preview**: Audition the alarm sound at the chosen volume level immediately.
-- **Gradual Escalation**: Soft and gentle initially, then ramps up tempo and audio intensity if unaddressed.
-- **Launch at Windows Startup (minimized)**: Runs silently in the background when your computer boots.
-- **Default Snooze**: Default 5 minutes or 15 minutes.
-
----
-
-## 🪟 Windows System Tray & Hotkeys
-- **`Ctrl + F7`**: Global toggle hotkey. Brings the window to the front or hides it to the tray from anywhere in Windows.
-- **Close Button `[X]`**: Hides to the tray; timers continue running uninterrupted.
-- **Tray Quick Actions (Right-Click Context Menu)**:
-  - `⏯️ Pause / Resume Active Timer`
-  - `📌 Toggle Mini HUD`
-  - `Show / Hide (Ctrl+F7)`
-  - `Exit App`
-- **Dynamic Tooltip**: Hovering your mouse over the clock icon shows:
-  `Next: check laundry (42m 10s)`.
-- **Missed Alarm & Sleep Wake Detection**:
-  If your laptop or PC goes to sleep during an appointment, the app detects clock drift upon wake-up and shows an *"Overdue Reminders"* alert so you never miss what happened while away.
+| Shortcut / Action | Behavior |
+|---|---|
+| **`Ctrl + F7`** *(Global)* | Toggle main window visibility from any application in Windows |
+| **`Ctrl + T`** *(Scratchpad)* | Insert `[YYYY-MM-DD HH:MM:SS] ` timestamp at cursor |
+| **`Enter`** *(Inputs)* | Submit Quick Natural Schedule or Daily Task Timer form |
+| **Window `[X]` Button** | Hide window to Windows System Tray (timers keep running) |
+| **Tray Icon Hover / Right-Click** | View live next-reminder countdown tooltip; Pause/Resume, Toggle HUD, or Exit |

@@ -4,6 +4,10 @@
   "volume": 85,
   "default_snooze_minutes": 5,
   "gradual_escalation": true,
-  "start_on_boot": false
+  "start_on_boot": false,
+  "hud_enabled": false,
+  "hud_x": 120,
+  "hud_y": 80,
+  "popup_corner": "bottom_right",
+  "overlay_opacity": 90
 }
-

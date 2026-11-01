@@ -1,156 +1,160 @@
-"""Interactive Dark-Mode Mini Calendar Widget using Python standard library calendar and Tkinter."""
+"""Interactive Dark-Mode Mini Calendar Widget using Python standard library calendar and PySide6."""
 import calendar
 import datetime
-import tkinter as tk
 from typing import Callable, Set, Optional
-from src.config import COLORS, FONT_FAMILY
+from PySide6.QtCore import Qt, Signal
+from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QGridLayout, QPushButton, QLabel
+from src.config import COLORS
 
-class MiniCalendar(tk.Frame):
-    def __init__(self, parent, on_date_selected: Optional[Callable[[datetime.date], None]] = None, **kwargs):
-        super().__init__(parent, bg=COLORS["bg_dark"], **kwargs)
+
+class MiniCalendar(QWidget):
+    dateSelected = Signal(object)
+
+    def __init__(
+        self,
+        parent: Optional[QWidget] = None,
+        on_date_selected: Optional[Callable[[datetime.date], None]] = None,
+    ):
+        super().__init__(parent)
         self.on_date_selected = on_date_selected
+        if on_date_selected:
+            self.dateSelected.connect(on_date_selected)
 
         today = datetime.date.today()
-        self.current_year = today.year
-        self.current_month = today.month
-        self.selected_date = today
+        self.current_year: int = today.year
+        self.current_month: int = today.month
+        self.selected_date: datetime.date = today
         self.event_dates: Set[datetime.date] = set()
 
         self._cal = calendar.Calendar(firstweekday=6)  # Sunday first
         self._build_ui()
         self.render_calendar()
 
-    def _build_ui(self):
-        # Quick Relative Date Chips
-        chip_frame = tk.Frame(self, bg=COLORS["bg_dark"])
-        chip_frame.pack(fill="x", pady=(0, 6))
+    def _build_ui(self) -> None:
+        main_layout = QVBoxLayout(self)
+        main_layout.setContentsMargins(0, 0, 0, 0)
+        main_layout.setSpacing(4)
 
-        tk.Label(chip_frame, text="Quick Date:", font=(FONT_FAMILY, 8, "bold"),
-                 bg=COLORS["bg_dark"], fg=COLORS["text_muted"]).pack(side="left", padx=(0, 4))
-
-        quick_buttons = [
+        # Quick relative date chips
+        chip_row = QHBoxLayout()
+        chip_row.setSpacing(4)
+        for label, cmd in [
             ("Today", self._select_today),
-            ("Tomorrow", self._select_tomorrow),
-            ("This Friday", self._select_friday),
-            ("Next Monday", self._select_next_monday)
-        ]
+            ("Tmrw", self._select_tomorrow),
+            ("Fri", self._select_friday),
+            ("Mon", self._select_next_monday),
+        ]:
+            btn = QPushButton(label)
+            btn.setCursor(Qt.CursorShape.PointingHandCursor)
+            btn.setFixedHeight(22)
+            btn.clicked.connect(cmd)
+            chip_row.addWidget(btn)
+        main_layout.addLayout(chip_row)
 
-        for label, cmd in quick_buttons:
-            tk.Button(
-                chip_frame, text=label, font=(FONT_FAMILY, 8),
-                bg=COLORS["surface"], fg=COLORS["text"], activebackground=COLORS["accent"],
-                relief="flat", cursor="hand2", padx=6, pady=2, command=cmd
-            ).pack(side="left", padx=2)
+        # Month navigation bar
+        nav_row = QHBoxLayout()
+        nav_row.setSpacing(4)
 
-        # Month Navigation Header
-        nav_frame = tk.Frame(self, bg=COLORS["surface"], padx=8, pady=4)
-        nav_frame.pack(fill="x", pady=(0, 4))
+        btn_prev = QPushButton("◀")
+        btn_prev.setFixedSize(28, 22)
+        btn_prev.setCursor(Qt.CursorShape.PointingHandCursor)
+        btn_prev.clicked.connect(self._prev_month)
 
-        tk.Button(
-            nav_frame, text="◀", font=(FONT_FAMILY, 9, "bold"),
-            bg=COLORS["surface_light"], fg=COLORS["text"], relief="flat",
-            cursor="hand2", padx=8, pady=1, command=self._prev_month
-        ).pack(side="left")
+        self.lbl_month_year = QLabel("")
+        self.lbl_month_year.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.lbl_month_year.setStyleSheet(f"font-weight: bold; color: {COLORS['text']};")
 
-        self.lbl_month_year = tk.Label(
-            nav_frame, text="", font=(FONT_FAMILY, 10, "bold"),
-            bg=COLORS["surface"], fg=COLORS["text"]
-        )
-        self.lbl_month_year.pack(side="left", expand=True)
+        btn_next = QPushButton("▶")
+        btn_next.setFixedSize(28, 22)
+        btn_next.setCursor(Qt.CursorShape.PointingHandCursor)
+        btn_next.clicked.connect(self._next_month)
 
-        tk.Button(
-            nav_frame, text="▶", font=(FONT_FAMILY, 9, "bold"),
-            bg=COLORS["surface_light"], fg=COLORS["text"], relief="flat",
-            cursor="hand2", padx=8, pady=1, command=self._next_month
-        ).pack(side="right")
+        nav_row.addWidget(btn_prev)
+        nav_row.addWidget(self.lbl_month_year, 1)
+        nav_row.addWidget(btn_next)
+        main_layout.addLayout(nav_row)
 
-        # Calendar Grid Table
-        self.grid_frame = tk.Frame(self, bg=COLORS["bg_dark"])
-        self.grid_frame.pack(fill="x")
+        # Calendar grid
+        self.grid_layout = QGridLayout()
+        self.grid_layout.setSpacing(2)
+        self.grid_layout.setContentsMargins(0, 0, 0, 0)
 
-        # Weekday headers (Su, Mo, Tu, We, Th, Fr, Sa)
         day_names = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"]
         for col_idx, d_name in enumerate(day_names):
-            # Highlight Sunday (col 0) and Saturday (col 6)
             color = COLORS["accent_warning"] if col_idx in (0, 6) else COLORS["text_muted"]
-            lbl = tk.Label(
-                self.grid_frame, text=d_name, font=(FONT_FAMILY, 8, "bold"),
-                bg=COLORS["bg_dark"], fg=color, width=4, pady=2
-            )
-            lbl.grid(row=0, column=col_idx, padx=1, pady=1)
+            lbl = QLabel(d_name)
+            lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            lbl.setStyleSheet(f"font-size: 10px; font-weight: bold; color: {color};")
+            self.grid_layout.addWidget(lbl, 0, col_idx)
 
-    def set_event_dates(self, dates: Set[datetime.date]):
+        main_layout.addLayout(self.grid_layout)
+        self._day_buttons: list[QPushButton] = []
+
+    def set_event_dates(self, dates: Set[datetime.date]) -> None:
         """Highlight dates on the calendar that contain scheduled rendez-vous."""
         self.event_dates = dates
         self.render_calendar()
 
-    def render_calendar(self):
-        # Update header
-        month_name = calendar.month_name[self.current_month]
-        self.lbl_month_year.config(text=f"{month_name} {self.current_year}")
+    def render_calendar(self) -> None:
+        month_name = calendar.month_abbr[self.current_month]
+        self.lbl_month_year.setText(f"{month_name} {self.current_year}")
 
-        # Clear existing day cells (from row 1 onward)
-        for widget in self.grid_frame.grid_slaves():
-            if int(widget.grid_info()["row"]) > 0:
-                widget.destroy()
+        for btn in self._day_buttons:
+            self.grid_layout.removeWidget(btn)
+            btn.deleteLater()
+        self._day_buttons.clear()
 
         today = datetime.date.today()
         month_days = self._cal.monthdatescalendar(self.current_year, self.current_month)
 
         for row_idx, week in enumerate(month_days, start=1):
             for col_idx, day_date in enumerate(week):
-                is_current_month = (day_date.month == self.current_month)
-                is_today = (day_date == today)
-                is_selected = (day_date == self.selected_date)
+                is_current_month = day_date.month == self.current_month
+                is_today = day_date == today
+                is_selected = day_date == self.selected_date
                 has_event = day_date in self.event_dates
 
-                # Determine styles
                 if is_selected:
                     bg_color = COLORS["accent"]
                     fg_color = "#ffffff"
-                    font_style = (FONT_FAMILY, 8, "bold")
+                    weight = "bold"
                 elif is_today:
                     bg_color = COLORS["surface_light"]
                     fg_color = COLORS["accent_warning"]
-                    font_style = (FONT_FAMILY, 8, "bold")
+                    weight = "bold"
                 elif not is_current_month:
                     bg_color = COLORS["bg_dark"]
                     fg_color = "#52525b"
-                    font_style = (FONT_FAMILY, 8)
+                    weight = "normal"
                 else:
                     bg_color = COLORS["surface"]
                     fg_color = COLORS["text"]
-                    font_style = (FONT_FAMILY, 8)
+                    weight = "normal"
 
-                # Day button label (e.g., "15" or "15•")
                 day_text = str(day_date.day)
                 if has_event and not is_selected:
                     day_text += "•"
 
-                btn = tk.Button(
-                    self.grid_frame,
-                    text=day_text,
-                    font=font_style,
-                    bg=bg_color,
-                    fg=fg_color,
-                    activebackground=COLORS["accent_hover"],
-                    relief="flat",
-                    cursor="hand2",
-                    width=4,
-                    height=1,
-                    command=lambda d=day_date: self._on_day_clicked(d)
+                btn = QPushButton(day_text)
+                btn.setCursor(Qt.CursorShape.PointingHandCursor)
+                btn.setFixedHeight(22)
+                btn.setStyleSheet(
+                    f"QPushButton {{ background-color: {bg_color}; color: {fg_color}; "
+                    f"font-weight: {weight}; font-size: 11px; padding: 1px; border-radius: 3px; }}"
+                    f"QPushButton:hover {{ background-color: {COLORS['accent_hover']}; color: #ffffff; }}"
                 )
-                btn.grid(row=row_idx, column=col_idx, padx=1, pady=1)
+                btn.clicked.connect(lambda _checked=False, d=day_date: self._on_day_clicked(d))
+                self.grid_layout.addWidget(btn, row_idx, col_idx)
+                self._day_buttons.append(btn)
 
-    def _on_day_clicked(self, date_val: datetime.date):
+    def _on_day_clicked(self, date_val: datetime.date) -> None:
         self.selected_date = date_val
         self.current_year = date_val.year
         self.current_month = date_val.month
         self.render_calendar()
-        if self.on_date_selected:
-            self.on_date_selected(date_val)
+        self.dateSelected.emit(date_val)
 
-    def _prev_month(self):
+    def _prev_month(self) -> None:
         if self.current_month == 1:
             self.current_month = 12
             self.current_year -= 1
@@ -158,7 +162,7 @@ class MiniCalendar(tk.Frame):
             self.current_month -= 1
         self.render_calendar()
 
-    def _next_month(self):
+    def _next_month(self) -> None:
         if self.current_month == 12:
             self.current_month = 1
             self.current_year += 1
@@ -166,25 +170,22 @@ class MiniCalendar(tk.Frame):
             self.current_month += 1
         self.render_calendar()
 
-    def _select_today(self):
+    def _select_today(self) -> None:
         self._on_day_clicked(datetime.date.today())
 
-    def _select_tomorrow(self):
+    def _select_tomorrow(self) -> None:
         self._on_day_clicked(datetime.date.today() + datetime.timedelta(days=1))
 
-    def _select_friday(self):
+    def _select_friday(self) -> None:
         today = datetime.date.today()
-        # weekday(): Monday is 0, Friday is 4
         days_ahead = (4 - today.weekday()) % 7
         if days_ahead == 0:
             days_ahead = 7
         self._on_day_clicked(today + datetime.timedelta(days=days_ahead))
 
-    def _select_next_monday(self):
+    def _select_next_monday(self) -> None:
         today = datetime.date.today()
-        # Monday is 0
         days_ahead = (0 - today.weekday()) % 7
         if days_ahead == 0:
             days_ahead = 7
         self._on_day_clicked(today + datetime.timedelta(days=days_ahead))
-

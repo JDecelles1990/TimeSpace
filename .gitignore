@@ -25,5 +25,7 @@ $RECYCLE.BIN/
 # User generated data / runtime reminders & local settings
 data/reminders.json
 data/settings.json
+data/history.json
+data/scratchpad.json
 !data/.gitkeep
 !data/settings.example.json
