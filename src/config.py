@@ -5,8 +5,8 @@ from typing import Dict, Any, Tuple, List
 # ---------------------------------------------------------------------------
 # Application Metadata & Global Shortcuts
 # ---------------------------------------------------------------------------
-APP_TITLE = "Timer & Rendez-vous"
-APP_REGISTRY_NAME = "TimerAndRendezVous"
+APP_TITLE = "TimeSpace"
+APP_REGISTRY_NAME = "TimeSpace"
 HOTKEY = "ctrl+f7"
 FONT_FAMILY = "Segoe UI"
 

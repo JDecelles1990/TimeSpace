@@ -1,4 +1,4 @@
-# Timer & Rendez-vous ⏰
+# TimeSpace ⏰
 
 A sleek, dark-mode **PySide6** desktop application and pluggable **F7Hub** module for daily task timers, calendar appointments (Rendez-vous), and time-stamped scratchpad notes on Windows 10/11.
 

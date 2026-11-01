@@ -1,4 +1,4 @@
-"""Launch the Timer & Rendez-vous application."""
+"""Launch the TimeSpace application."""
 import os
 import sys
 import subprocess

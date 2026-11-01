@@ -1,4 +1,4 @@
-# User Guide — Timer & Rendez-vous (`Docs/USER_GUIDE.md`)
+# User Guide — TimeSpace (`Docs/USER_GUIDE.md`)
 
 > **Canonical Scope**: End-user operational manual covering all controls, the 6 module tabs, natural-language scheduling grammar, notifications, Floating Mini HUD, and keyboard shortcuts.
 > *(For technical architecture and F7Hub embedding, see [ARCHITECTURE.md](ARCHITECTURE.md). For file/state schemas, see [STATE_AND_CONFIG.md](STATE_AND_CONFIG.md).)*

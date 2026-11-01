@@ -31,7 +31,7 @@ class CalendarManager:
         lines = [
             "BEGIN:VCALENDAR",
             "VERSION:2.0",
-            "PRODID:-//Timer and Rendez-vous App//EN",
+            "PRODID:-//TimeSpace App//EN",
             "CALSCALE:GREGORIAN",
             "METHOD:PUBLISH"
         ]

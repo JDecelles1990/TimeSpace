@@ -1,15 +1,15 @@
 # AGENTS.md — Canonical AI Coding Agent Specification
 
 > **MANDATORY PRE- & POST-IMPLEMENTATION DIRECTIVES**
-> 1. **Before coding**: Every AI coding agent MUST read this file in full before planning, modifying, or adding any code in this repository. This file is the authoritative governance contract and routing index for **Timer & Rendez-vous**.
+> 1. **Before coding**: Every AI coding agent MUST read this file in full before planning, modifying, or adding any code in this repository. This file is the authoritative governance contract and routing index for **TimeSpace** (formerly *Timer & Rendez-vous*).
 > 2. **After every implementation**: Every AI coding agent MUST document all code, schema, UI, or architectural changes in the corresponding `Docs/*.md` owner files and append an entry to [Docs/CHANGELOG.md](Docs/CHANGELOG.md) before concluding any task. A task is **not complete** until `Docs/*.md` are updated and verified.
 
 ---
 
 ## 1. System Identity & Dual-Mode Scope
 
-**Timer & Rendez-vous** is a dark-mode Windows 10/11 desktop module built with **Python 3.10+** and **PySide6**. It operates in two interchangeable modes:
-1. **Embedded F7Hub Module**: `TimerRendezVousWidget(QWidget)` plugs directly into the parent **F7Hub** modular monolith shell without creating competing windows, tray icons, or event loops.
+**TimeSpace** is a dark-mode Windows 10/11 desktop module built with **Python 3.10+** and **PySide6**. It operates in two interchangeable modes:
+1. **Embedded F7Hub Module**: `TimerRendezVousWidget(QWidget)` (aliased as `TimeSpaceWidget`) plugs directly into the parent **F7Hub** modular monolith shell without creating competing windows, tray icons, or event loops.
 2. **Standalone Desktop Application**: `run.py` launches `MainApp(QMainWindow)`, wrapping `TimerRendezVousWidget` with Windows System Tray residency (`pystray`), native Win32 global hotkey toggling (`Ctrl+F7`), and auto-relaunch into `.venv`.
 
 *(For integration code and execution flow, see [Docs/ARCHITECTURE.md](Docs/ARCHITECTURE.md#1-dual-mode-execution--f7hub-embedding).)*

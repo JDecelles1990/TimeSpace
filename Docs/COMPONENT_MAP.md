@@ -8,7 +8,7 @@
 ## 1. Repository Directory Structure
 
 ```
-Timer & Rendez-vous/
+TimeSpace/
 ├── AGENTS.md                  # Canonical AI Coding Agent governance & routing contract
 ├── README.md                  # Concise project overview & quick-start guide
 ├── LICENSE                    # MIT License

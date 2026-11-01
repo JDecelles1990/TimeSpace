@@ -72,8 +72,8 @@ Persisted to `data/scratchpad.json` via `Storage.load_scratchpad()` / `Storage.s
 ## 2. Application Constants, Geometry & Domain Presets (`src/config.py`)
 
 ### 2.1 Identity & Shortcut Constants
-- `APP_TITLE = "Timer & Rendez-vous"` — Window title, tray title, and Windows Action Center toast `app_id`.
-- `APP_REGISTRY_NAME = "TimerAndRendezVous"` — Registry value name under `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`.
+- `APP_TITLE = "TimeSpace"` — Window title, tray title, and Windows Action Center toast `app_id`.
+- `APP_REGISTRY_NAME = "TimeSpace"` — Registry value name under `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`.
 - `HOTKEY = "ctrl+f7"` — Global show/hide hotkey parsed by `GlobalHotkeyListener`.
 - `FONT_FAMILY = "Segoe UI"` — Primary UI typeface (`Consolas` is used inside the Scratchpad editor).
 

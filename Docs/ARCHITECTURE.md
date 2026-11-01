@@ -84,4 +84,4 @@ PySide6 forbids touching `QWidget` instances from non-GUI threads. All backgroun
 - **Sleep / Hibernation Drift Detector**: `_run_loop()` compares `gap = now - last_tick` every `500ms`. If `gap > 6.0` seconds (indicating OS suspend/hibernate), any non-paused item with `target_time < now` triggers `on_wake_missed_callback` -> `SchedulerBridge.wakeMissed`.
 
 ### 3.5 Windows Boot Auto-Start (`src/startup.py`)
-- Writes or removes `"<pythonw.exe>" "<run.py>" --minimized` under `HKCU\Software\Microsoft\Windows\CurrentVersion\Run` (`TimerAndRendezVous`), preferring `pythonw.exe` inside `.venv\Scripts` so boot startup never flashes a console window.
+- Writes or removes `"<pythonw.exe>" "<run.py>" --minimized` under `HKCU\Software\Microsoft\Windows\CurrentVersion\Run` (`TimeSpace`), preferring `pythonw.exe` inside `.venv\Scripts` so boot startup never flashes a console window.

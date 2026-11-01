@@ -1,4 +1,4 @@
-"""PySide6 UI for Timer & Rendez-vous Module (F7Hub Modular Widget & Standalone Window)."""
+"""PySide6 UI for TimeSpace (F7Hub Modular Widget & Standalone Window)."""
 import sys
 import os
 import time
@@ -1646,3 +1646,6 @@ class MainApp(QMainWindow):
     def mainloop(self) -> None:
         """Compatibility launcher method for run.py."""
         sys.exit(self._qt_app.exec())
+
+
+TimeSpaceWidget = TimerRendezVousWidget

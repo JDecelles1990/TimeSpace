@@ -1,11 +1,13 @@
 # Engineering & Migration Changelog (`Docs/CHANGELOG.md`)
 
-> **Canonical Scope**: Chronological record of all architectural refactors, UI migrations, layout adjustments, bug fixes, and intentionally removed features across **Timer & Rendez-vous**.
+> **Canonical Scope**: Chronological record of all architectural refactors, UI migrations, layout adjustments, bug fixes, and intentionally removed features across **TimeSpace** (formerly *Timer & Rendez-vous*).
 > *(For current system design, see [ARCHITECTURE.md](ARCHITECTURE.md). For state schemas, see [STATE_AND_CONFIG.md](STATE_AND_CONFIG.md).)*
 
 ---
 
-## [v3.3] — Actionable Links/Notes, Exact Monthly Recurrence & Overlay Opacity (2026-10-31)
+## [v3.3] — TimeSpace Rebrand, Actionable Links/Notes, Monthly Recurrence & Overlay Opacity (2026-10-31)
+- **Rebranded Application & Repository to `TimeSpace`**:
+  - Updated `APP_TITLE` and `APP_REGISTRY_NAME` to `"TimeSpace"` (`src/config.py`), added `TimeSpaceWidget` alias (`src/gui.py`, `src/__init__.py`), and published to the standalone GitHub repository `JDecelles1990/TimeSpace` while preserving the legacy Tkinter repository separately.
 - **Actionable Links & Short Notes (`Timers`, `RDV`, `AlarmDialog`, `Activity`, `History`, `.ics`)**:
   - Added compact side-by-side `Link / URL / Path` and `Short Note` inputs to both Tab 1 (`1. Timers ⏳`) and Tab 2 (`2. RDV 📅`), pairing `Alert` and `Repeat` horizontally in Tab 2 so the bottom `Active Reminders Queue` retains full multi-row height.
   - Added `normalize_link_target()` and `open_attachment_link()` in `src/notifications.py` supporting web URLs, bare domains (`teams.microsoft.com/...`), custom protocol URIs, and local Windows files/folders.
