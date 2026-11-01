@@ -4,7 +4,6 @@
   "volume": 85,
   "default_snooze_minutes": 5,
   "gradual_escalation": true,
-  "start_on_boot": false,
-  "pomodoro_count": 0,
-  "auto_start_breaks": false
+  "start_on_boot": false
 }
+
