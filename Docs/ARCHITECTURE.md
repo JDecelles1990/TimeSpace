@@ -8,7 +8,7 @@ The application maintains responsiveness, smooth canvas rendering, and non-block
 |                              Main GUI Thread (gui.py)                             |
 |  - Tkinter event loop & canvas rendering                                          |
 |  - Radial Circular Progress Ring with Pause/Resume (circular_ring.py)             |
-|  - Pomodoro technique workflow & streak tracking                                  |
+|  - Activity Dashboard (Timers & Rendez-vous management)                           |
 |  - Smart Natural Language Input Parser (natural_parser.py)                        |
 |  - Settings & Preferences management (storage.py)                                 |
 +-----------------------------------------------------------------------------------+
@@ -29,7 +29,7 @@ The application maintains responsiveness, smooth canvas rendering, and non-block
 |   System Tray Daemon         |     |    - winmm.dll MCI player     |             |
 |   (src/tray.py)              |     |    - setaudio volume 0-1000   |             |
 |   - Live hover tooltip update|     |    - gradual volume fade-in   |             |
-|   - Quick Pomodoro triggers  |     +-------------------------------+             |
+|   - Quick Pause/Resume action|     +-------------------------------+             |
 +------------------------------+                                                   |
          |                                                                         |
          v                                                                         |
