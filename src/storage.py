@@ -112,6 +112,22 @@ class Storage:
             pass
 
     @classmethod
+    def delete_history_indices(cls, indices: List[int]) -> int:
+        """Remove history entries at the specified 0-based indices and persist."""
+        cls._ensure_dir()
+        history = cls.load_history()
+        drop_set = {i for i in indices if 0 <= i < len(history)}
+        if not drop_set:
+            return 0
+        updated = [item for idx, item in enumerate(history) if idx not in drop_set]
+        try:
+            with open(HISTORY_FILE, "w", encoding="utf-8") as f:
+                json.dump(updated, f, indent=2)
+        except Exception:
+            pass
+        return len(drop_set)
+
+    @classmethod
     def clear_history(cls) -> None:
         """Clear the history log."""
         cls._ensure_dir()
@@ -146,6 +162,50 @@ class Storage:
                 json.dump(payload, f, indent=2)
         except Exception:
             pass
+
+    @classmethod
+    def export_scratchpad_note(
+        cls,
+        title: str,
+        content: str,
+        filepath: Optional[str] = None,
+    ) -> str:
+        """Export a Scratchpad pane's notes directly to C:\\Temp (created if missing) and return its absolute filepath."""
+        clean_title = re.sub(r"^[^\w]+", "", title).strip() or "Scratchpad"
+        slug = re.sub(r"[^A-Za-z0-9._-]+", "_", clean_title).strip("_") or "Notes"
+        stamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+        fname = f"TimeSpace_Scratchpad_{slug}_{stamp}.md"
+
+        now_local = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        body = (
+            f"# TimeSpace — {clean_title}\n\n"
+            f"- **Exported**: `{now_local}`\n\n"
+            "---\n\n"
+            f"{content.strip()}\n"
+        )
+
+        if filepath and filepath.strip():
+            raw_dest = filepath.strip()
+            dest = raw_dest if os.path.isabs(raw_dest) or os.path.dirname(raw_dest) else os.path.join(REPORTS_DIR, raw_dest)
+            parent = os.path.dirname(os.path.abspath(dest))
+            if parent:
+                os.makedirs(parent, exist_ok=True)
+            with open(dest, "w", encoding="utf-8") as f:
+                f.write(body)
+            return os.path.abspath(dest)
+
+        try:
+            os.makedirs(REPORTS_DIR, exist_ok=True)
+            dest = os.path.join(REPORTS_DIR, fname)
+            with open(dest, "w", encoding="utf-8") as f:
+                f.write(body)
+            return os.path.abspath(dest)
+        except OSError:
+            cls._ensure_dir()
+            dest = os.path.join(DATA_DIR, fname)
+            with open(dest, "w", encoding="utf-8") as f:
+                f.write(body)
+            return os.path.abspath(dest)
 
     # ── Diagnostic Incident Reports (.md / .txt / .json) ─────────────────────
 

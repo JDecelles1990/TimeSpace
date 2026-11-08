@@ -47,6 +47,8 @@ from PySide6.QtWidgets import (
     QFileDialog,
     QPlainTextEdit,
     QProgressBar,
+    QSplitter,
+    QSizePolicy,
 )
 
 from src.config import COLORS, GO_DIAG_ACTIONS, GO_TARGET_PRESETS
@@ -95,8 +97,13 @@ class GoTroubleshootingTab(QWidget):
 
     diagnostic_completed = Signal(dict)
     sendToScratchpad = Signal(str)
+    customTargetsChanged = Signal(list)
 
-    def __init__(self, parent: Optional[QWidget] = None):
+    def __init__(
+        self,
+        parent: Optional[QWidget] = None,
+        custom_targets: Optional[List[Dict[str, str]]] = None,
+    ):
         super().__init__(parent)
         self._repo_root: Path = Path(__file__).resolve().parent.parent
         self._go_engine_dir: Path = self._repo_root / "go_engine"
@@ -108,6 +115,7 @@ class GoTroubleshootingTab(QWidget):
         self._current_action: str = ""
         self._current_target: str = ""
         self._action_buttons: List[QPushButton] = []
+        self._custom_targets: List[Dict[str, str]] = list(custom_targets or [])
 
         self._build_ui()
 
@@ -115,29 +123,30 @@ class GoTroubleshootingTab(QWidget):
 
     def _build_ui(self) -> None:
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(8, 6, 8, 6)
-        layout.setSpacing(6)
+        layout.setContentsMargins(6, 4, 6, 4)
+        layout.setSpacing(4)
 
-        # Top Configuration Group (Mode + Build + Target/Presets + 2x4 Action Grid + Elevated CLI Launcher)
+        # Top Configuration Group (Mode + Build + Target/Presets + 2x4 Action Grid + Dual CLI Launchers)
         cfg_group = QGroupBox("⚡ Go Diagnostic & Remediation Engine")
         cfg_layout = QVBoxLayout(cfg_group)
-        cfg_layout.setContentsMargins(8, 6, 8, 6)
-        cfg_layout.setSpacing(5)
+        cfg_layout.setContentsMargins(6, 5, 6, 5)
+        cfg_layout.setSpacing(4)
 
         mode_row = QHBoxLayout()
-        mode_row.setSpacing(6)
-        mode_row.addWidget(QLabel("Engine Mode:"))
+        mode_row.setSpacing(4)
+        mode_row.addWidget(QLabel("Mode:"))
         self.combo_mode = QComboBox()
-        self.combo_mode.addItem("Compiled Binary Mode (Zero-Dependency)", "binary")
-        self.combo_mode.addItem("Go Script Mode (go run)", "go_run")
+        self.combo_mode.setMinimumWidth(0)
+        self.combo_mode.addItem("Compiled Binary (Zero-Dep)", "binary")
+        self.combo_mode.addItem("Go Script (go run)", "go_run")
         mode_row.addWidget(self.combo_mode, 1)
 
         self.lbl_engine_status = QLabel(self._detect_engine_badge())
-        self.lbl_engine_status.setStyleSheet(f"color: {COLORS['text_muted']}; font-size: 11px;")
+        self.lbl_engine_status.setStyleSheet(f"color: {COLORS['text_muted']}; font-size: 10px;")
         mode_row.addWidget(self.lbl_engine_status)
 
-        self.btn_build_bins = QPushButton("🔨 Build Binaries")
-        self.btn_build_bins.setFixedHeight(24)
+        self.btn_build_bins = QPushButton("🔨")
+        self.btn_build_bins.setFixedHeight(23)
         self.btn_build_bins.setToolTip("Cross-compile Go binaries into /bin via go_engine/build_all.ps1")
         self.btn_build_bins.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_build_bins.clicked.connect(self.build_go_binaries)
@@ -145,31 +154,54 @@ class GoTroubleshootingTab(QWidget):
         cfg_layout.addLayout(mode_row)
 
         target_row = QHBoxLayout()
-        target_row.setSpacing(6)
+        target_row.setSpacing(4)
         target_row.addWidget(QLabel("Target:"))
         self.entry_target = QLineEdit("1.1.1.1")
-        self.entry_target.setPlaceholderText("IP, hostname, or URL (e.g., 1.1.1.1, github.com)")
+        self.entry_target.setMinimumWidth(0)
+        self.entry_target.setPlaceholderText("IP, hostname, or URL")
         target_row.addWidget(self.entry_target, 2)
 
         self.combo_presets = QComboBox()
-        self.combo_presets.setToolTip("Quick-select common diagnostic targets")
-        for label, host_val in GO_TARGET_PRESETS:
-            self.combo_presets.addItem(label, host_val)
+        self.combo_presets.setMinimumWidth(0)
+        self.combo_presets.setToolTip("Quick-select saved custom target bookmarks (⭐) or built-in targets")
         self.combo_presets.currentIndexChanged.connect(self._on_preset_selected)
         target_row.addWidget(self.combo_presets, 2)
 
+        self.btn_save_target = QPushButton("⭐")
+        self.btn_save_target.setFixedWidth(28)
+        self.btn_save_target.setFixedHeight(23)
+        self.btn_save_target.setToolTip("Bookmark current Target host/IP into saved presets")
+        self.btn_save_target.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_save_target.clicked.connect(self.save_current_target_bookmark)
+        target_row.addWidget(self.btn_save_target)
+
+        self.btn_delete_target = QPushButton("✕")
+        self.btn_delete_target.setObjectName("dangerBtn")
+        self.btn_delete_target.setFixedWidth(26)
+        self.btn_delete_target.setFixedHeight(23)
+        self.btn_delete_target.setToolTip("Remove current Target from saved custom bookmarks")
+        self.btn_delete_target.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_delete_target.clicked.connect(self.remove_current_target_bookmark)
+        target_row.addWidget(self.btn_delete_target)
+
+        self._refresh_presets_combo()
+
         target_row.addWidget(QLabel("Args:"))
         self.entry_extra_args = QLineEdit()
-        self.entry_extra_args.setPlaceholderText("Optional CLI flags")
+        self.entry_extra_args.setMinimumWidth(0)
+        self.entry_extra_args.setPlaceholderText("Flags")
         target_row.addWidget(self.entry_extra_args, 1)
         cfg_layout.addLayout(target_row)
 
         # 8 Action Buttons Grid (2 rows x 4 columns)
         grid = QGridLayout()
-        grid.setSpacing(5)
+        grid.setSpacing(4)
         for idx, (label, action_slug) in enumerate(GO_DIAG_ACTIONS):
             btn = QPushButton(label)
-            btn.setMinimumHeight(26)
+            btn.setMinimumWidth(0)
+            btn.setMinimumHeight(24)
+            btn.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+            btn.setStyleSheet("padding: 2px 4px; font-size: 11px;")
             btn.setCursor(Qt.CursorShape.PointingHandCursor)
             btn.clicked.connect(lambda _c=False, a=action_slug: self.run_diagnostic(a))
             row, col = divmod(idx, 4)
@@ -177,32 +209,46 @@ class GoTroubleshootingTab(QWidget):
             self._action_buttons.append(btn)
         cfg_layout.addLayout(grid)
 
-        # External Interactive Go CLI Launcher Bar (Elevation Checkbox + External Terminal Button)
+        # Dedicated Dual Interactive Go CLI Launchers: Admin Go CLI vs Standard Go CLI
         cli_launcher_layout = QHBoxLayout()
-        cli_launcher_layout.setSpacing(8)
+        cli_launcher_layout.setSpacing(6)
 
-        self.elevate_checkbox = QCheckBox("⚡ Run as Admin / sudo (Elevated Admin CLI)")
-        self.elevate_checkbox.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.elevate_checkbox.setStyleSheet(
-            f"QCheckBox {{ font-weight: bold; color: {COLORS['accent_warning']}; padding: 2px 4px; }}"
-        )
+        self.elevate_checkbox = QCheckBox("Admin")
+        self.elevate_checkbox.setVisible(False)
         self.elevate_checkbox.toggled.connect(self._on_elevate_toggled)
 
-        self.launch_cli_btn = QPushButton("🚀 Launch Standard Go CLI (User Diagnostics)")
-        self.launch_cli_btn.setObjectName("primaryBtn")
-        self.launch_cli_btn.setMinimumHeight(29)
-        self.launch_cli_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.launch_cli_btn.clicked.connect(lambda _c=False: self.launch_interactive_go_cli())
+        self.btn_admin_cli = QPushButton("🛡️ Admin Go CLI")
+        self.btn_admin_cli.setMinimumWidth(0)
+        self.btn_admin_cli.setMinimumHeight(26)
+        self.btn_admin_cli.setToolTip("Launch Elevated Admin Go CLI (UAC / sudo) for OS Network Repairs & Firewall Audits")
+        self.btn_admin_cli.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_admin_cli.setStyleSheet(
+            f"QPushButton {{ background-color: {COLORS['surface_light']}; color: {COLORS['accent_warning']}; "
+            f"border: 1px solid {COLORS['accent_warning']}; border-radius: 4px; font-weight: bold; padding: 3px 8px; }}"
+            f"QPushButton:hover {{ background-color: {COLORS['accent_warning']}; color: #111116; }}"
+        )
+        self.btn_admin_cli.clicked.connect(lambda _c=False: self.launch_interactive_go_cli(elevate_override=True))
 
-        cli_launcher_layout.addWidget(self.elevate_checkbox)
-        cli_launcher_layout.addWidget(self.launch_cli_btn, 1)
+        self.btn_std_cli = QPushButton("🚀 Standard Go CLI")
+        self.btn_std_cli.setObjectName("primaryBtn")
+        self.btn_std_cli.setMinimumWidth(0)
+        self.btn_std_cli.setMinimumHeight(26)
+        self.btn_std_cli.setToolTip("Launch Standard Non-Elevated Go CLI for User-Space Diagnostics")
+        self.btn_std_cli.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_std_cli.clicked.connect(lambda _c=False: self.launch_interactive_go_cli(elevate_override=False))
+
+        # Backward-compatible alias
+        self.launch_cli_btn = self.btn_std_cli
+
+        cli_launcher_layout.addWidget(self.btn_admin_cli, 1)
+        cli_launcher_layout.addWidget(self.btn_std_cli, 1)
         cfg_layout.addLayout(cli_launcher_layout)
 
         layout.addWidget(cfg_group)
 
         # Process Controls, Copy / Send to Scratchpad & Indeterminate Progress Bar Row
         ctrl_row = QHBoxLayout()
-        ctrl_row.setSpacing(5)
+        ctrl_row.setSpacing(4)
 
         self.progress_bar = QProgressBar()
         self.progress_bar.setRange(0, 1)
@@ -219,62 +265,151 @@ class GoTroubleshootingTab(QWidget):
         self.lbl_run_state.setStyleSheet(f"color: {COLORS['text_muted']}; font-size: 11px;")
         ctrl_row.addWidget(self.lbl_run_state)
 
-        self.btn_copy_out = QPushButton("📋 Copy")
-        self.btn_copy_out.setFixedHeight(23)
+        self.btn_copy_out = QPushButton("📋")
+        self.btn_copy_out.setFixedHeight(22)
         self.btn_copy_out.setToolTip("Copy console output to clipboard")
         self.btn_copy_out.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_copy_out.clicked.connect(self.copy_console_output)
         ctrl_row.addWidget(self.btn_copy_out)
 
-        self.btn_send_sp = QPushButton("📝 +Scratchpad")
-        self.btn_send_sp.setFixedHeight(23)
-        self.btn_send_sp.setToolTip("Append console output to 4. Scratchpad")
+        self.btn_send_sp = QPushButton("📝")
+        self.btn_send_sp.setFixedHeight(22)
+        self.btn_send_sp.setToolTip("Append console output to Scratchpad")
         self.btn_send_sp.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_send_sp.clicked.connect(self.send_console_to_scratchpad)
         ctrl_row.addWidget(self.btn_send_sp)
 
-        self.btn_export_report = QPushButton("💾 Export")
-        self.btn_export_report.setFixedHeight(23)
-        self.btn_export_report.setToolTip("Export diagnostic output to a .md, .txt, or .json incident report")
+        self.btn_export_report = QPushButton("💾")
+        self.btn_export_report.setFixedHeight(22)
+        self.btn_export_report.setToolTip("Export diagnostic output to C:\\Temp (.md, .txt, or .json)")
         self.btn_export_report.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_export_report.clicked.connect(lambda _c=False: self.export_console_report())
         ctrl_row.addWidget(self.btn_export_report)
 
-        self.btn_stop = QPushButton("⏹ Stop")
+        self.btn_stop = QPushButton("⏹️")
         self.btn_stop.setObjectName("dangerBtn")
-        self.btn_stop.setFixedHeight(23)
+        self.btn_stop.setFixedHeight(22)
+        self.btn_stop.setToolTip("Stop running diagnostic process")
         self.btn_stop.setEnabled(False)
         self.btn_stop.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_stop.clicked.connect(self.stop_process)
         ctrl_row.addWidget(self.btn_stop)
 
-        self.btn_clear = QPushButton("🧹 Clear")
-        self.btn_clear.setFixedHeight(23)
+        self.btn_clear = QPushButton("🧹")
+        self.btn_clear.setFixedHeight(22)
+        self.btn_clear.setToolTip("Clear console output")
         self.btn_clear.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_clear.clicked.connect(self.clear_console)
         ctrl_row.addWidget(self.btn_clear)
 
         layout.addLayout(ctrl_row)
 
-        # Read-Only Monospace Color-Highlighted Live Output Console
+        # Vertical Splitter: Top = Live Diagnostic Console, Bottom = 3rd Rich-Text Scratchpad
+        self.console_splitter = QSplitter(Qt.Orientation.Vertical)
+        self.console_splitter.setChildrenCollapsible(False)
+
         self.console = QPlainTextEdit()
         self.console.setReadOnly(True)
+        self.console.setMinimumHeight(90)
         mono_family = "Consolas" if sys.platform == "win32" else "Monospace"
         self.console.setFont(QFont(mono_family, 10))
         self.console.setPlaceholderText(
-            "Select any diagnostic or remediation action above to stream color-coded real-time output...\n"
-            "• Quick Target Presets let you switch between Cloudflare, Google, GitHub, Microsoft, or Localhost.\n"
-            "• Use '📋 Copy' or '📝 +Scratchpad' to capture results directly into your Time Notes Scratchpad.\n"
-            "• Click '🚀 Launch Interactive Go CLI' (with optional '⚡ Run as Admin / sudo') for an external REPL."
+            "Select any diagnostic action above to stream color-coded real-time output...\n"
+            "• Click '🛡️ Admin Go CLI' (elevated) or '🚀 Standard Go CLI' (user mode) for the interactive REPL."
         )
         self.console.setStyleSheet(
             f"QPlainTextEdit {{ background-color: {COLORS['bg_dark']}; color: {COLORS['text']}; "
-            f"border: 1px solid {COLORS['border']}; border-radius: 5px; padding: 6px; }}"
+            f"border: 1px solid {COLORS['border']}; border-radius: 5px; padding: 5px; }}"
         )
         self._console_highlighter = GoConsoleHighlighter(self.console.document())
-        layout.addWidget(self.console, 1)
+        self.console_splitter.addWidget(self.console)
 
-    # ── Preset, Copy, Scratchpad & Build Helpers ─────────────────────────────
+        layout.addWidget(self.console_splitter, 1)
+
+    def attach_scratchpad_widget(self, widget: QWidget) -> None:
+        """Attach the 3rd rich-text Scratchpad pane into the vertical splitter below the live console."""
+        widget.setMinimumHeight(85)
+        self.console_splitter.addWidget(widget)
+        self.console_splitter.setStretchFactor(0, 3)
+        self.console_splitter.setStretchFactor(1, 2)
+
+    # ── Preset, Custom Target Bookmarks, Copy, Scratchpad & Build Helpers ────
+
+    def set_custom_targets(self, targets: List[Dict[str, str]]) -> None:
+        """Load custom target bookmarks from AppConfig and refresh the presets dropdown."""
+        self._custom_targets = list(targets or [])
+        self._refresh_presets_combo()
+
+    def _refresh_presets_combo(self, select_host: Optional[str] = None) -> None:
+        self.combo_presets.blockSignals(True)
+        self.combo_presets.clear()
+        for entry in self._custom_targets:
+            host = str(entry.get("host", "") or "").strip()
+            label = str(entry.get("label", "") or host).strip()
+            if host:
+                display = f"⭐ {label}" if label == host else f"⭐ {label} ({host})"
+                self.combo_presets.addItem(display, host)
+        for label, host_val in GO_TARGET_PRESETS:
+            self.combo_presets.addItem(label, host_val)
+        if select_host:
+            idx = self.combo_presets.findData(select_host)
+            if idx >= 0:
+                self.combo_presets.setCurrentIndex(idx)
+        self.combo_presets.blockSignals(False)
+
+    def save_current_target_bookmark(self, label: Optional[str] = None) -> bool:
+        """Bookmark the current Target input into custom_go_targets and emit customTargetsChanged."""
+        raw = self.entry_target.text().strip()
+        if not raw:
+            return False
+        # Support optional "Label | host" syntax in Target input when bookmarking
+        if "|" in raw and not label:
+            parts = [p.strip() for p in raw.split("|", 1)]
+            bm_label, bm_host = (parts[0] or parts[1]), parts[1]
+            self.entry_target.setText(bm_host)
+        else:
+            bm_host = raw
+            bm_label = (label or raw).strip()
+
+        if not bm_host:
+            return False
+
+        updated: List[Dict[str, str]] = []
+        found = False
+        for item in self._custom_targets:
+            if str(item.get("host", "")).lower() == bm_host.lower():
+                updated.append({"label": bm_label, "host": bm_host})
+                found = True
+            else:
+                updated.append(item)
+        if not found:
+            updated.insert(0, {"label": bm_label, "host": bm_host})
+
+        self._custom_targets = updated
+        self._refresh_presets_combo(select_host=bm_host)
+        self.customTargetsChanged.emit(list(self._custom_targets))
+        self.lbl_run_state.setText(f"⭐ Bookmarked {bm_host}")
+        self.lbl_run_state.setStyleSheet(f"color: {COLORS['accent_success']}; font-size: 11px; font-weight: bold;")
+        return True
+
+    def remove_current_target_bookmark(self) -> bool:
+        """Remove the currently selected or typed custom target bookmark."""
+        target_host = self.entry_target.text().strip() or str(self.combo_presets.currentData() or "").strip()
+        if not target_host:
+            return False
+        before = len(self._custom_targets)
+        self._custom_targets = [
+            it for it in self._custom_targets if str(it.get("host", "")).lower() != target_host.lower()
+        ]
+        if len(self._custom_targets) == before:
+            self.lbl_run_state.setText("Built-in preset (cannot delete)")
+            self.lbl_run_state.setStyleSheet(f"color: {COLORS['text_muted']}; font-size: 11px;")
+            return False
+        self._refresh_presets_combo()
+        self.customTargetsChanged.emit(list(self._custom_targets))
+        self.lbl_run_state.setText(f"🗑️ Removed {target_host}")
+        self.lbl_run_state.setStyleSheet(f"color: {COLORS['accent_warning']}; font-size: 11px; font-weight: bold;")
+        return True
 
     def _on_preset_selected(self, index: int) -> None:
         host_val = self.combo_presets.itemData(index)
@@ -1125,6 +1260,7 @@ def _run_fallback_repl(initial_target: str, cli_mode: str = "auto") -> int:
         print(f"{p_norm}  ─────────────────────────────────────────────────────────────────{rst}", flush=True)
         print(f"{p_norm}  Multi-Select   — Enter multiple or ranges (e.g., 1,3,4 or 1-4, 6){rst}", flush=True)
         print(f"{p_norm}  target <host>  — Change active target host/IP{rst}", flush=True)
+        print(f"{p_norm}  bm [n|add|del] — List/use/add/delete saved target bookmarks{rst}", flush=True)
         print(f"{p_norm}  copy           — Copy last diagnostic output to clipboard{rst}", flush=True)
         print(f"{p_norm}  save [fmt]     — Export last output to C:\\Temp (.md, .txt, or .json){rst}", flush=True)
         print(f"{p_norm}  clr            — Clear terminal screen{rst}", flush=True)
@@ -1187,6 +1323,53 @@ def _run_fallback_repl(initial_target: str, cli_mode: str = "auto") -> int:
             if new_tgt:
                 target = new_tgt
                 print(f"{ok_col}✔ Active target updated to: {target}{rst}\n", flush=True)
+            continue
+        if lower == "bm" or lower == "bookmarks" or lower.startswith("bm ") or lower.startswith("bookmarks "):
+            cfg = Storage.load_config()
+            bms = list(cfg.custom_go_targets or [])
+            parts = cmd.split(None, 2)
+            sub = parts[1].lower() if len(parts) > 1 else ""
+            if not sub:
+                print(f"\n{p_bold}⭐ Saved Target Bookmarks:{rst}", flush=True)
+                all_entries: List[Tuple[str, str, bool]] = [
+                    (str(e.get("label", "") or e.get("host", "")), str(e.get("host", "")), True)
+                    for e in bms
+                    if e.get("host")
+                ] + [(lbl, h, False) for lbl, h in GO_TARGET_PRESETS]
+                for idx_bm, (lbl, h, is_custom) in enumerate(all_entries, start=1):
+                    star = "⭐" if is_custom else "  "
+                    print(f"  [{idx_bm}] {star} {lbl} -> {h}", flush=True)
+                print("  Tip: 'bm <number>' to select, 'bm add <host> [label]' to save, 'bm del <host>' to remove.\n", flush=True)
+            elif sub == "add":
+                rest = parts[2].strip() if len(parts) > 2 else target
+                sub_parts = rest.split(None, 1)
+                h_val = sub_parts[0].strip()
+                l_val = sub_parts[1].strip() if len(sub_parts) > 1 else h_val
+                if h_val:
+                    bms = [e for e in bms if str(e.get("host", "")).lower() != h_val.lower()]
+                    bms.insert(0, {"label": l_val, "host": h_val})
+                    cfg.custom_go_targets = bms
+                    Storage.save_config(cfg)
+                    target = h_val
+                    print(f"{ok_col}✔ Bookmarked '{l_val}' ({h_val}) and set as active target.{rst}\n", flush=True)
+            elif sub in ("del", "rm", "remove"):
+                h_val = parts[2].strip() if len(parts) > 2 else target
+                before_cnt = len(bms)
+                bms = [e for e in bms if str(e.get("host", "")).lower() != h_val.lower()]
+                if len(bms) < before_cnt:
+                    cfg.custom_go_targets = bms
+                    Storage.save_config(cfg)
+                    print(f"{ok_col}✔ Removed bookmark '{h_val}'.{rst}\n", flush=True)
+                else:
+                    print(f"{fail_col}✖ Custom bookmark '{h_val}' not found.{rst}\n", flush=True)
+            elif sub.isdigit():
+                idx_sel = int(sub) - 1
+                all_hosts = [str(e.get("host", "")) for e in bms if e.get("host")] + [h for _, h in GO_TARGET_PRESETS]
+                if 0 <= idx_sel < len(all_hosts):
+                    target = all_hosts[idx_sel]
+                    print(f"{ok_col}✔ Active target set from bookmark [{sub}]: {target}{rst}\n", flush=True)
+                else:
+                    print(f"{fail_col}✖ Invalid bookmark number [{sub}].{rst}\n", flush=True)
             continue
 
         actions, parse_err = _parse_repl_selection(cmd, admin_mode=admin_mode)

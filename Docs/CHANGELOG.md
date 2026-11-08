@@ -5,6 +5,40 @@
 
 ---
 
+## [v3.8] — Scratchpad Power Tools (`Ctrl+F`, Schedule Selection, `C:\Temp` Export) & Custom Go Target Bookmarks (2026-11-08)
+- **Scratchpad Power Tools Across All 3 Rich-Text Scratchpads (`src/gui.py`, `src/storage.py`)**:
+  - **Inline `Ctrl+F` Search Bar (`🔍`)**: Added a toggleable compact find bar (`find_bar`, `entry_find`, `▲` previous, `▼` next, `✖` close, `Ctrl+F` open, `Escape` close) inside `RichScratchpadPane` with wrap-around case-insensitive search and emerald/crimson match feedback.
+  - **Schedule Highlighted Text as Timer / RDV (`⏰`)**: Added `btn_schedule` (`⏰`) and right-click context menu integration (`ScratchpadEditor.scheduleContextRequested`) that extracts the highlighted text (or current cursor line), automatically pulls any embedded URL into the reminder's `url` attachment field, and offers 1-click scheduling via `NaturalParser.parse()`, quick timers (`15m`, `30m`, `1h`, `2h`), or pre-filling Tab 1 (`1. Timers ⏳`) / Tab 2 (`2. RDV 📅`).
+  - **1-Click Scratchpad Markdown Export to `C:\Temp` (`💾` / `Ctrl+S`)**: Added `Storage.export_scratchpad_note()` (`src/storage.py`) and `btn_export` (`💾` + `Ctrl+S` shortcut) to export any of the 3 Scratchpads directly to `C:\Temp\TimeSpace_Scratchpad_<slug>_<timestamp>.md`.
+- **Custom Saved Target Bookmarks in `5. Go ⏱️` & Interactive Go CLI (`src/config.py`, `src/go_tab.py`, `src/gui.py`, `go_engine/main.go`)**:
+  - Added `AppConfig.custom_go_targets: List[Dict[str, str]]` persisted in `data/settings.json` with automatic sanitization in `AppConfig.from_dict()`.
+  - Added **`⭐`** (`save_current_target_bookmark()`, supporting optional `Label | host` syntax) and **`✕`** (`remove_current_target_bookmark()`) next to `combo_presets` in `GoTroubleshootingTab`, displaying user bookmarks at the top of the presets dropdown (`⭐ Label (host)`).
+  - Added the `bm [n|add|del]` (alias `bookmarks`) command to both the pure-Go Interactive CLI (`go_engine/main.go`) and the Python fallback REPL (`src/go_tab.py`) to list, select, add, and delete custom target bookmarks directly from the terminal.
+
+---
+
+## [v3.7] — Compact Emoji UI, Inline Timer/RDV Editing, 3 Rich Scratchpads, Opacity Sliders & Tab Hotkeys (2026-11-08)
+- **Section 1 (`1. Timers ⏳`) — Compact Presets, Non-Overlapping Countdown Row & Inline Active Editing (`src/config.py`, `src/scheduler.py`, `src/gui.py`)**:
+  - Shortened `QUICK_TIMER_PRESETS` labels to `15m`, `30m`, `1h`, `2h` with responsive sizing (`setMinimumWidth(0)`).
+  - Replaced `"Start Timer ▶"` with compact `▶️` (`40px` width) and constrained `spin_h`, `spin_m`, `spin_s` widths (`maxWidth=62px`) with compact `🔁` repeat checkbox so controls never overlap when resized small.
+  - Added `ReminderScheduler.get_item()` and `ReminderScheduler.update_item()` (`src/scheduler.py`) plus inline editing (`_begin_edit_timer`, `_begin_edit_rdv`, `✏️` button, and double-click on Queue/Activity items) that populates form fields and switches `▶️` to `💾` (with `✖` cancel) to update running timers and RDVs in-place.
+- **Section 2 (`2. RDV 📅`) — Responsive 'Appointment Details' & Compact Emoji Buttons (`src/time_picker.py`, `src/gui.py`)**:
+  - Rebuilt `BigButtonsTimePicker` (`src/time_picker.py`) with a responsive `QGridLayout`, `setMinimumWidth(0)`, and `set_time(h, m)` so controls never clip at narrow widths.
+  - Updated RDV action buttons to `📤 .ics`, `📥 .ics`, `✏️`, and `➕ RDV` (switching to `💾 RDV` when editing an active RDV).
+- **Section 3 (`3. Activity 📋`) & Section 6 (`6. History 📜`) — Full-Height Lists & `Delete` Key Binding (`src/storage.py`, `src/gui.py`)**:
+  - Automatically hid the bottom `Active Reminders Queue` on Tab 3 (`3. Activity 📋`) and Tab 6 (`6. History 📜`) so lists expand to 100% of vertical space.
+  - Added `HistoryListWidget(QListWidget)` (`deleteKeyPressed` on `Qt.Key.Key_Delete`) and `Storage.delete_history_indices()` (`src/storage.py`) to delete individual selected history items via the `Delete` key or `🗑️` button.
+- **Section 4 (`4. Scratchpad 📝`) & Section 5 (`5. Go ⏱️`) — Hero Deck Cleanup, 3 Rich-Text Scratchpads & Dual CLI Buttons (`src/config.py`, `src/go_tab.py`, `src/gui.py`)**:
+  - Automatically hid the top Hero Deck (circular timer + Quick Natural Schedule bar) on Tab 4 (`4. Scratchpad 📝`), Tab 5 (`5. Go ⏱️`), and Tab 7 (`7. Settings ⚙️`).
+  - Added `RichScratchpadPane(QWidget)` (`src/gui.py`) and extended `ScratchpadState` (`upper_content`, `upper_html`, `go_content`, `go_html`) to provide **Dual Upper & Lower Rich-Text Scratchpads** inside a `QSplitter(Qt.Orientation.Vertical)` on Tab 4 and a **3rd Rich-Text Scratchpad** inside a vertical `QSplitter` below the live console on Tab 5 (all with `𝐁` Bold, `🎨` Color, `🕒` Timestamp, `📋` Copy, `🧹` Clear, and detectable clickable URLs).
+  - Replaced the single CLI launch bar in `5. Go ⏱️` (`src/go_tab.py`) with two dedicated side-by-side buttons: **`🛡️ Admin Go CLI`** (`elevate_override=True`) and **`🚀 Standard Go CLI`** (`elevate_override=False`).
+- **Section 7 (`7. Settings ⚙️`) & Global Window Improvements (`src/config.py`, `src/gui.py`)**:
+  - Added `AppConfig.app_opacity` (`45–100%`, default `90%`) with a live **`🔆` Opacity Slider** in the top header bar (immediately to the left of the `📌 HUD` button) synchronized with an **App Transparency** slider in `7. Settings ⚙️`.
+  - Added keyboard shortcuts **`1`–`7`** (and `Alt+1`–`Alt+7`) to navigate directly across all 7 tabs (`eventFilter` guarded so typing numbers in inputs works normally).
+  - Updated `MainApp.toggle_visibility()` (`Ctrl+F7`) to minimize (`showMinimized()`) when visible or restore (`showNormal()`, `activateWindow()`) when minimized/hidden, and set the balanced minimum window size to `480×540`.
+
+---
+
 ## [v3.6] — `5. Go ⏱️` Enhancements: Color Console, Scratchpad Bridge, HTTP/DNS Probes, Presets & Binary Builder (2026-11-01)
 - **Color-Coded Live Output Console (`src/go_tab.py`)**:
   - Added `GoConsoleHighlighter(QSyntaxHighlighter)` highlighting `[PASS]`/`OPEN`/`✔`/`200 OK` in emerald green, `[FAIL]`/`[ERROR]`/`[STDERR]`/`UNREACHABLE`/`✖` in crimson red, `CLOSED/FILTERED`/`[WARN]`/`[STOPPED]`/`ELEVATED` in amber, and `═══` action headers in sky cyan using `COLORS` tokens.

@@ -24,7 +24,9 @@ Persisted to `data/settings.json` via `Storage.load_config() -> AppConfig` and `
 | `hud_x` | `int` | `120` | Last saved screen X coordinate of `FloatingMiniHUD`. |
 | `hud_y` | `int` | `80` | Last saved screen Y coordinate of `FloatingMiniHUD`. |
 | `popup_corner` | `str` | `"bottom_right"` | Anchor corner preference for `AlarmDialog`. |
-| `overlay_opacity` | `int` | `90` | Window opacity percentage (`60`–`100`, clamped on load) applied to `FloatingMiniHUD` and `AlarmDialog` cards while keeping `MainApp` `100%` opaque. |
+| `overlay_opacity` | `int` | `90` | Window opacity percentage (`60`–`100`, clamped on load) applied to `FloatingMiniHUD` and `AlarmDialog` cards. |
+| `app_opacity` | `int` | `90` | Main application window opacity percentage (`45`–`100`, default `90`, clamped on load) controlled by the synchronized Top Header opacity slider (`slider_header_opacity`) and Settings App Transparency slider (`slider_app_opacity`). |
+| `custom_go_targets` | `List[Dict[str, str]]` | `[]` | User-saved favorite diagnostic target bookmarks (`{"label": ..., "host": ...}`) displayed at the top of the `5. Go ⏱️` presets dropdown (`⭐ Label (host)`) and accessible in the Interactive Go CLI via `bm`. |
 
 ### 1.2 `ScheduledItem` (`src/scheduler.py`)
 Persisted as a JSON array in `data/reminders.json` via `Storage.load_reminders()` / `Storage.save_reminders()`. Protected in memory by `ReminderScheduler._lock`.
@@ -64,9 +66,13 @@ Persisted to `data/scratchpad.json` via `Storage.load_scratchpad()` / `Storage.s
 
 | Field | Type | Default | Purpose |
 |---|---|---|---|
-| `content` | `str` | `""` | Full plain-text body of Tab 4 (`4. Scratchpad 📝`). |
-| `html` | `str` | `""` | Rich-text HTML representation preserving bold and custom foreground text colors across sessions. |
-| `updated_at` | `str` | `""` | Last auto-save time (`"%H:%M:%S"`) displayed in the Scratchpad toolbar. |
+| `content` | `str` | `""` | Plain-text body of the Lower Scratchpad in Tab 4 (`4. Scratchpad 📝`). |
+| `html` | `str` | `""` | Rich-text HTML of the Lower Scratchpad in Tab 4 (`4. Scratchpad 📝`). |
+| `upper_content` | `str` | `""` | Plain-text body of the Upper Scratchpad in Tab 4 (`4. Scratchpad 📝`). |
+| `upper_html` | `str` | `""` | Rich-text HTML of the Upper Scratchpad in Tab 4 (`4. Scratchpad 📝`). |
+| `go_content` | `str` | `""` | Plain-text body of the 3rd Go Scratchpad in Tab 5 (`5. Go ⏱️`). |
+| `go_html` | `str` | `""` | Rich-text HTML of the 3rd Go Scratchpad in Tab 5 (`5. Go ⏱️`). |
+| `updated_at` | `str` | `""` | Last auto-save time (`"%H:%M:%S"`) displayed in the Scratchpad toolbars. |
 
 ---
 
@@ -81,7 +87,7 @@ Persisted to `data/scratchpad.json` via `Storage.load_scratchpad()` / `Storage.s
 ### 2.2 `UI_DIMENSIONS` Pixel Specification
 | Key | Value | Component |
 |---|---|---|
-| `window_width` / `window_height` | `650` × `800` | Default `MainApp` window geometry (minimum size `600` × `720`). |
+| `window_width` / `window_height` | `650` × `800` | Default `MainApp` window geometry (minimum size `min_window_width` × `min_window_height` = `480` × `540`). |
 | `ring_size` / `ring_width` | `124` / `8` | `CircularProgressRing` square canvas size and stroke width in pixels. |
 | `hud_width` / `hud_height` | `276` × `40` | `FloatingMiniHUD` frameless desktop pill dimensions. |
 | `toast_width` / `toast_height` | `350` × `132` | Standard `AlarmDialog` bottom-right notification card dimensions. |
@@ -100,7 +106,7 @@ Persisted to `data/scratchpad.json` via `Storage.load_scratchpad()` / `Storage.s
 - **List Density**: `QListWidget` uses `11px` font and `2px 6px` item padding so the persistent Active Reminders Queue displays 7–9+ rows simultaneously and Activity lists display ~15+ rows.
 
 ### 2.4 Shared Domain Presets
-- `QUICK_TIMER_PRESETS`: `[("15 Minutes", 15), ("30 Minutes", 30), ("1 Hour", 60), ("2 Hours", 120)]`
+- `QUICK_TIMER_PRESETS`: `[("15m", 15), ("30m", 30), ("1h", 60), ("2h", 120)]`
 - `CATEGORIES`: `["📌 General", "💼 Work", "📞 Callback", "🔄 Follow-up", "🎫 Ticket", "🩺 Health", "🏠 Personal"]`
 - `SNOOZE_OPTIONS`: `[5, 10, 15, 30]` (minutes)
 - `SOUND_PRESETS`: `{"gentle": ..., "digital": ..., "urgent": ..., "custom": ...}`

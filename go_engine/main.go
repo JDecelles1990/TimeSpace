@@ -302,6 +302,124 @@ func parseREPLSelection(raw string, adminMode bool) ([]string, error) {
 	return actions, nil
 }
 
+func handleBookmarksCommand(input string, currentTarget string, pBold string, okCol string, failCol string, rst string) string {
+	settingsPath := filepath.Join("..", "data", "settings.json")
+	if _, err := os.Stat(settingsPath); os.IsNotExist(err) {
+		settingsPath = filepath.Join("data", "settings.json")
+	}
+	rawCfg := make(map[string]interface{})
+	if b, err := os.ReadFile(settingsPath); err == nil {
+		_ = json.Unmarshal(b, &rawCfg)
+	}
+	type bmEntry struct {
+		Label string `json:"label"`
+		Host  string `json:"host"`
+	}
+	var custom []bmEntry
+	if listRaw, ok := rawCfg["custom_go_targets"].([]interface{}); ok {
+		for _, item := range listRaw {
+			if m, ok := item.(map[string]interface{}); ok {
+				h, _ := m["host"].(string)
+				l, _ := m["label"].(string)
+				if strings.TrimSpace(h) != "" {
+					if strings.TrimSpace(l) == "" {
+						l = h
+					}
+					custom = append(custom, bmEntry{Label: strings.TrimSpace(l), Host: strings.TrimSpace(h)})
+				}
+			}
+		}
+	}
+	builtins := []bmEntry{
+		{Label: "Cloudflare DNS (1.1.1.1)", Host: "1.1.1.1"},
+		{Label: "Google DNS (8.8.8.8)", Host: "8.8.8.8"},
+		{Label: "GitHub (github.com)", Host: "github.com"},
+		{Label: "Google (google.com)", Host: "google.com"},
+		{Label: "Microsoft (microsoft.com)", Host: "microsoft.com"},
+		{Label: "Localhost (127.0.0.1)", Host: "127.0.0.1"},
+	}
+
+	fields := strings.Fields(input)
+	sub := ""
+	if len(fields) > 1 {
+		sub = strings.ToLower(fields[1])
+	}
+	if sub == "" {
+		fmt.Printf("\n%s⭐ Saved Target Bookmarks:%s\n", pBold, rst)
+		idx := 1
+		for _, e := range custom {
+			fmt.Printf("  [%d] ⭐ %s -> %s\n", idx, e.Label, e.Host)
+			idx++
+		}
+		for _, e := range builtins {
+			fmt.Printf("  [%d]    %s -> %s\n", idx, e.Label, e.Host)
+			idx++
+		}
+		fmt.Printf("  Tip: 'bm <number>' to select, 'bm add <host> [label]' to save, 'bm del <host>' to remove.\n\n")
+		return currentTarget
+	}
+	if sub == "add" {
+		h := currentTarget
+		l := currentTarget
+		if len(fields) > 2 {
+			h = fields[2]
+			l = h
+			if len(fields) > 3 {
+				l = strings.Join(fields[3:], " ")
+			}
+		}
+		var updated []bmEntry
+		updated = append(updated, bmEntry{Label: l, Host: h})
+		for _, e := range custom {
+			if !strings.EqualFold(e.Host, h) {
+				updated = append(updated, e)
+			}
+		}
+		rawCfg["custom_go_targets"] = updated
+		_ = os.MkdirAll(filepath.Dir(settingsPath), 0o755)
+		if outBytes, err := json.MarshalIndent(rawCfg, "", "  "); err == nil {
+			_ = os.WriteFile(settingsPath, outBytes, 0o644)
+		}
+		fmt.Printf("%s✔ Bookmarked '%s' (%s) and set as active target.%s\n\n", okCol, l, h, rst)
+		return h
+	}
+	if sub == "del" || sub == "rm" || sub == "remove" {
+		h := currentTarget
+		if len(fields) > 2 {
+			h = fields[2]
+		}
+		var updated []bmEntry
+		removed := false
+		for _, e := range custom {
+			if strings.EqualFold(e.Host, h) {
+				removed = true
+			} else {
+				updated = append(updated, e)
+			}
+		}
+		if removed {
+			rawCfg["custom_go_targets"] = updated
+			if outBytes, err := json.MarshalIndent(rawCfg, "", "  "); err == nil {
+				_ = os.WriteFile(settingsPath, outBytes, 0o644)
+			}
+			fmt.Printf("%s✔ Removed bookmark '%s'.%s\n\n", okCol, h, rst)
+		} else {
+			fmt.Printf("%s✖ Custom bookmark '%s' not found.%s\n\n", failCol, h, rst)
+		}
+		return currentTarget
+	}
+	if n, err := strconv.Atoi(sub); err == nil {
+		all := append(custom, builtins...)
+		if n >= 1 && n <= len(all) {
+			chosen := all[n-1].Host
+			fmt.Printf("%s✔ Active target set from bookmark [%d]: %s%s\n\n", okCol, n, chosen, rst)
+			return chosen
+		}
+		fmt.Printf("%s✖ Invalid bookmark number [%d].%s\n\n", failCol, n, rst)
+	}
+	return currentTarget
+}
+
 func runInteractiveREPL(initialTarget string, cliMode string) {
 	target := initialTarget
 	if target == "" {
@@ -369,6 +487,7 @@ func runInteractiveREPL(initialTarget string, cliMode string) {
 		fmt.Printf("%s  ─────────────────────────────────────────────────────────────────%s\n", pNorm, rst)
 		fmt.Printf("%s  Multi-Select   — Enter multiple or ranges (e.g., 1,3,4 or 1-4, 6)%s\n", pNorm, rst)
 		fmt.Printf("%s  target <host>  — Change active target host/IP%s\n", pNorm, rst)
+		fmt.Printf("%s  bm [n|add|del] — List/use/add/delete saved target bookmarks%s\n", pNorm, rst)
 		fmt.Printf("%s  copy           — Copy last diagnostic output to clipboard%s\n", pNorm, rst)
 		fmt.Printf("%s  save [fmt]     — Export last output to C:\\Temp (.md, .txt, or .json)%s\n", pNorm, rst)
 		fmt.Printf("%s  clr            — Clear terminal screen%s\n", pNorm, rst)
@@ -429,6 +548,10 @@ func runInteractiveREPL(initialTarget string, cliMode string) {
 				target = newTgt
 				fmt.Printf("%s✔ Active target updated to: %s%s\n\n", okCol, target, rst)
 			}
+			continue
+		}
+		if lower == "bm" || lower == "bookmarks" || strings.HasPrefix(lower, "bm ") || strings.HasPrefix(lower, "bookmarks ") {
+			target = handleBookmarksCommand(input, target, pBold, okCol, failCol, rst)
 			continue
 		}
 

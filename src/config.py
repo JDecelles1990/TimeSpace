@@ -1,5 +1,5 @@
 """Unified application configuration, theme palette, QSS stylesheet, UI dimensions, and typed state models."""
-from dataclasses import dataclass, asdict
+from dataclasses import dataclass, asdict, field
 from typing import Dict, Any, Tuple, List
 
 # ---------------------------------------------------------------------------
@@ -34,6 +34,8 @@ COLORS: Dict[str, str] = {
 UI_DIMENSIONS: Dict[str, Any] = {
     "window_width": 650,
     "window_height": 800,
+    "min_window_width": 480,
+    "min_window_height": 540,
     "ring_size": 124,
     "ring_width": 8,
     "hud_width": 276,
@@ -68,10 +70,10 @@ CATEGORIES: List[str] = [
 SLA_PRESETS: List[Tuple[str, int, str]] = []
 
 QUICK_TIMER_PRESETS: List[Tuple[str, int]] = [
-    ("15 Minutes", 15),
-    ("30 Minutes", 30),
-    ("1 Hour", 60),
-    ("2 Hours", 120),
+    ("15m", 15),
+    ("30m", 30),
+    ("1h", 60),
+    ("2h", 120),
 ]
 
 SNOOZE_OPTIONS: List[int] = [5, 10, 15, 30]
@@ -124,7 +126,7 @@ QGroupBox {{
     border: 1px solid {COLORS["border"]};
     border-radius: 6px;
     margin-top: 8px;
-    padding: 8px 8px 6px 8px;
+    padding: 8px 6px 6px 6px;
     font-weight: bold;
     color: {COLORS["accent"]};
 }}
@@ -152,8 +154,8 @@ QTabBar::tab {{
     border-bottom: none;
     border-top-left-radius: 5px;
     border-top-right-radius: 5px;
-    padding: 5px 7px;
-    margin-right: 2px;
+    padding: 4px 5px;
+    margin-right: 1px;
     font-size: 11px;
     font-weight: bold;
 }}
@@ -174,7 +176,7 @@ QLineEdit, QPlainTextEdit, QTextEdit, QSpinBox, QComboBox {{
     color: {COLORS["text"]};
     border: 1px solid {COLORS["border"]};
     border-radius: 4px;
-    padding: 4px 6px;
+    padding: 3px 5px;
     selection-background-color: {COLORS["accent"]};
 }}
 
@@ -211,7 +213,7 @@ QPushButton {{
     color: {COLORS["text"]};
     border: 1px solid {COLORS["border"]};
     border-radius: 4px;
-    padding: 4px 10px;
+    padding: 3px 6px;
     font-weight: 600;
 }}
 
@@ -250,6 +252,26 @@ QPushButton#dangerBtn:hover {{
     background-color: {COLORS["accent_danger"]};
     border-color: {COLORS["accent_danger"]};
     color: #ffffff;
+}}
+
+QSplitter::handle {{
+    background-color: {COLORS["border"]};
+}}
+
+QSplitter::handle:vertical {{
+    height: 4px;
+    margin: 2px 0;
+    border-radius: 2px;
+}}
+
+QSplitter::handle:horizontal {{
+    width: 4px;
+    margin: 0 2px;
+    border-radius: 2px;
+}}
+
+QSplitter::handle:hover {{
+    background-color: {COLORS["accent"]};
 }}
 
 QMenu {{
@@ -297,7 +319,7 @@ QSlider::handle:horizontal {{
 }}
 
 QCheckBox {{
-    spacing: 6px;
+    spacing: 5px;
     color: {COLORS["text"]};
 }}
 """
@@ -320,6 +342,8 @@ class AppConfig:
     hud_y: int = 80
     popup_corner: str = "bottom_right"
     overlay_opacity: int = 90
+    app_opacity: int = 90
+    custom_go_targets: List[Dict[str, str]] = field(default_factory=list)
 
     def to_dict(self) -> Dict[str, Any]:
         return asdict(self)
@@ -333,6 +357,25 @@ class AppConfig:
                 filtered["overlay_opacity"] = max(60, min(100, int(filtered["overlay_opacity"])))
             except (TypeError, ValueError):
                 filtered["overlay_opacity"] = 90
+        if "app_opacity" in filtered:
+            try:
+                filtered["app_opacity"] = max(45, min(100, int(filtered["app_opacity"])))
+            except (TypeError, ValueError):
+                filtered["app_opacity"] = 90
+        if "custom_go_targets" in filtered:
+            raw_targets = filtered["custom_go_targets"]
+            clean_targets: List[Dict[str, str]] = []
+            if isinstance(raw_targets, list):
+                for entry in raw_targets:
+                    if isinstance(entry, dict):
+                        host = str(entry.get("host", "") or "").strip()
+                        label = str(entry.get("label", "") or host).strip()
+                        if host:
+                            clean_targets.append({"label": label or host, "host": host})
+                    elif isinstance(entry, str) and entry.strip():
+                        h = entry.strip()
+                        clean_targets.append({"label": h, "host": h})
+            filtered["custom_go_targets"] = clean_targets
         return cls(**filtered)
 
 
@@ -365,9 +408,13 @@ class HistoryEntry:
 
 @dataclass
 class ScratchpadState:
-    """Persistent state for the Time Notes Scratchpad (Tab 4)."""
+    """Persistent state for the multi-pane Time Notes Scratchpads (Tab 4 Upper/Lower & Tab 5 Go)."""
     content: str = ""
     html: str = ""
+    upper_content: str = ""
+    upper_html: str = ""
+    go_content: str = ""
+    go_html: str = ""
     updated_at: str = ""
 
     def to_dict(self) -> Dict[str, Any]:
@@ -376,7 +423,11 @@ class ScratchpadState:
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "ScratchpadState":
         return cls(
-            content=data.get("content", ""),
+            content=str(data.get("content", "") or ""),
             html=str(data.get("html", "") or ""),
-            updated_at=data.get("updated_at", ""),
+            upper_content=str(data.get("upper_content", "") or ""),
+            upper_html=str(data.get("upper_html", "") or ""),
+            go_content=str(data.get("go_content", "") or ""),
+            go_html=str(data.get("go_html", "") or ""),
+            updated_at=str(data.get("updated_at", "") or ""),
         )

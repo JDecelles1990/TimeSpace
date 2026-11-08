@@ -1,4 +1,4 @@
-"""Thread-safe Timer & Rendez-vous scheduler with pause/resume, categories, attachments, and repeating rules."""
+"""Thread-safe Timer & Rendez-vous scheduler with pause/resume, inline editing, categories, attachments, and repeating rules."""
 import time
 import uuid
 import calendar
@@ -134,6 +134,64 @@ class ReminderScheduler:
             self.items.append(item)
             self._persist()
         return item_id
+
+    def get_item(self, item_id: str) -> Optional[ScheduledItem]:
+        """Lookup an active ScheduledItem by ID."""
+        with self._lock:
+            for it in self.items:
+                if it.id == item_id:
+                    return it
+        return None
+
+    def update_item(
+        self,
+        item_id: str,
+        name: Optional[str] = None,
+        seconds_from_now: Optional[float] = None,
+        repeat_sec: Optional[int] = None,
+        repeat_rule: Optional[str] = None,
+        category: Optional[str] = None,
+        lead_time_min: Optional[int] = None,
+        url: Optional[str] = None,
+        note: Optional[str] = None,
+        anchor_day: Optional[int] = None,
+    ) -> Optional[ScheduledItem]:
+        """Update an active timer or rendez-vous in-place and persist changes."""
+        now_ts = time.time()
+        with self._lock:
+            for it in self.items:
+                if it.id == item_id:
+                    if lead_time_min is not None:
+                        it.lead_time_min = max(0, int(lead_time_min))
+                    if name is not None:
+                        import re
+                        base_name = re.sub(r"^\[\d+m Early\]\s*", "", name.strip()) or "Untitled Reminder"
+                        if it.lead_time_min > 0:
+                            it.name = f"[{it.lead_time_min}m Early] {base_name}"
+                        else:
+                            it.name = base_name
+                    if seconds_from_now is not None and seconds_from_now > 0:
+                        eff = max(1.0, float(seconds_from_now) - (it.lead_time_min * 60))
+                        if it.is_paused:
+                            it.remaining_paused = eff
+                        else:
+                            it.target_time = now_ts + eff
+                        it.original_duration = max(1.0, eff)
+                    if repeat_sec is not None:
+                        it.repeat_sec = max(0, int(repeat_sec))
+                    if repeat_rule is not None:
+                        it.repeat_rule = repeat_rule.lower()
+                    if category is not None:
+                        it.category = category
+                    if url is not None:
+                        it.url = url.strip()
+                    if note is not None:
+                        it.note = note.strip()
+                    if anchor_day is not None:
+                        it.anchor_day = int(anchor_day)
+                    self._persist()
+                    return it
+        return None
 
     def remove_item(self, item_id: str) -> None:
         with self._lock:
