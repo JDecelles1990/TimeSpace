@@ -5,6 +5,12 @@
 
 ---
 
+## [v3.9] — Neon Gradient Button Glow (2026-11-09)
+- **Violet ➔ Cyan Hover & Cyan ➔ Green Pressed Gradients (src/config.py, src/gui.py)**: Added glow_violet, glow_violet_light, glow_cyan, glow_green COLORS tokens and rewrote the QPushButton hover/pressed DARK_QSS rules (including #primaryBtn, #successBtn, #dangerBtn) with qlineargradient fills. Added ButtonGlowFilter(QObject) (src/gui.py) installed by TimerRendezVousWidget, applying a QGraphicsDropShadowEffect neon glow (violet on hover, cyan on press) to every QPushButton and removing it on leave.
+- **Gradient Tab Buttons (src/config.py)**: The 7 QTabBar::tab buttons now use a violet ➔ cyan gradient on hover and a cyan ➔ green gradient on the selected (clicked) tab. *(QTabBar tabs are not widgets, so they get the gradients but not the drop-shadow glow.)*
+
+---
+
 ## [v3.8] — Scratchpad Power Tools (`Ctrl+F`, Schedule Selection, `C:\Temp` Export) & Custom Go Target Bookmarks (2026-11-08)
 - **Scratchpad Power Tools Across All 3 Rich-Text Scratchpads (`src/gui.py`, `src/storage.py`)**:
   - **Inline `Ctrl+F` Search Bar (`🔍`)**: Added a toggleable compact find bar (`find_bar`, `entry_find`, `▲` previous, `▼` next, `✖` close, `Ctrl+F` open, `Escape` close) inside `RichScratchpadPane` with wrap-around case-insensitive search and emerald/crimson match feedback.

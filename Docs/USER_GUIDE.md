@@ -7,6 +7,7 @@
 
 ## 1. Header & Hero Deck (Top Section)
 
+- **Neon Button Glow**: Every button glows with a violet ➔ cyan gradient while hovered and flashes a cyan ➔ green gradient while clicked. The 7 tab buttons use the same gradients (violet ➔ cyan on hover, cyan ➔ green for the active tab).
 - **Header Bar**: Displays the application title, keyboard shortcut hint (`Ctrl+F7 | Keys 1-7`), the **App Window Opacity Slider (`🔆 45%–100%`, default `90%`)** immediately on the left of the **`📌 HUD`** button, and the **`📌 HUD`** toggle button.
 - **Left — ⭕ Radial Circular Progress Ring** *(visible on Tabs 1, 2, 3, and 6; hidden on Tabs 4, 5, and 7 for maximum vertical workspace)*:
   - Smoothly depletes clockwise for your active timer (or nearest upcoming Rendez-vous when no timer is active).

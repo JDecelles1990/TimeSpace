@@ -26,6 +26,10 @@ COLORS: Dict[str, str] = {
     "text": "#f4f4f5",
     "text_muted": "#9ca3af",
     "border": "#2e2e3d",
+    "glow_violet": "#8b5cf6",
+    "glow_violet_light": "#a78bfa",
+    "glow_cyan": "#22d3ee",
+    "glow_green": "#34d399",
 }
 
 # ---------------------------------------------------------------------------
@@ -161,14 +165,18 @@ QTabBar::tab {{
 }}
 
 QTabBar::tab:selected {{
-    background-color: {COLORS["accent"]};
-    color: #ffffff;
-    border-color: {COLORS["accent"]};
+    background-color: qlineargradient(x1:0, y1:0, x2:1, y2:1,
+        stop:0 {COLORS["glow_cyan"]}, stop:1 {COLORS["glow_green"]});
+    color: #0b0b10;
+    border-color: {COLORS["glow_green"]};
 }}
 
-QTabBar::tab:hover:!selected {{
-    background-color: {COLORS["surface_light"]};
-    color: {COLORS["text"]};
+QTabBar::tab:hover {{
+    background-color: qlineargradient(x1:0, y1:0, x2:1, y2:1,
+        stop:0 {COLORS["glow_violet"]}, stop:1 {COLORS["glow_cyan"]});
+    border: 1px solid {COLORS["glow_violet_light"]};
+    border-bottom: none;
+    color: #ffffff;
 }}
 
 QLineEdit, QPlainTextEdit, QTextEdit, QSpinBox, QComboBox {{
@@ -218,9 +226,17 @@ QPushButton {{
 }}
 
 QPushButton:hover {{
-    background-color: {COLORS["accent"]};
-    border-color: {COLORS["accent"]};
+    background-color: qlineargradient(x1:0, y1:0, x2:1, y2:1,
+        stop:0 {COLORS["glow_violet"]}, stop:1 {COLORS["glow_cyan"]});
+    border: 1px solid {COLORS["glow_violet_light"]};
     color: #ffffff;
+}}
+
+QPushButton:pressed {{
+    background-color: qlineargradient(x1:0, y1:0, x2:1, y2:1,
+        stop:0 {COLORS["glow_cyan"]}, stop:1 {COLORS["glow_green"]});
+    border: 1px solid {COLORS["glow_green"]};
+    color: #0b0b10;
 }}
 
 QPushButton#primaryBtn {{
@@ -231,7 +247,16 @@ QPushButton#primaryBtn {{
 }}
 
 QPushButton#primaryBtn:hover {{
-    background-color: {COLORS["accent_hover"]};
+    background-color: qlineargradient(x1:0, y1:0, x2:1, y2:1,
+        stop:0 {COLORS["glow_violet"]}, stop:1 {COLORS["glow_cyan"]});
+    border: 1px solid {COLORS["glow_violet_light"]};
+}}
+
+QPushButton#primaryBtn:pressed, QPushButton#successBtn:pressed, QPushButton#dangerBtn:pressed {{
+    background-color: qlineargradient(x1:0, y1:0, x2:1, y2:1,
+        stop:0 {COLORS["glow_cyan"]}, stop:1 {COLORS["glow_green"]});
+    border: 1px solid {COLORS["glow_green"]};
+    color: #0b0b10;
 }}
 
 QPushButton#successBtn {{
@@ -239,6 +264,12 @@ QPushButton#successBtn {{
     border-color: {COLORS["accent_success"]};
     color: #ffffff;
     font-weight: bold;
+}}
+
+QPushButton#successBtn:hover {{
+    background-color: qlineargradient(x1:0, y1:0, x2:1, y2:1,
+        stop:0 {COLORS["glow_violet"]}, stop:1 {COLORS["glow_cyan"]});
+    border: 1px solid {COLORS["glow_violet_light"]};
 }}
 
 QPushButton#dangerBtn {{
@@ -249,8 +280,9 @@ QPushButton#dangerBtn {{
 }}
 
 QPushButton#dangerBtn:hover {{
-    background-color: {COLORS["accent_danger"]};
-    border-color: {COLORS["accent_danger"]};
+    background-color: qlineargradient(x1:0, y1:0, x2:1, y2:1,
+        stop:0 {COLORS["glow_violet"]}, stop:1 {COLORS["glow_cyan"]});
+    border: 1px solid {COLORS["glow_violet_light"]};
     color: #ffffff;
 }}
 

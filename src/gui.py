@@ -48,6 +48,7 @@ from PySide6.QtWidgets import (
     QColorDialog,
     QSplitter,
     QSizePolicy,
+    QGraphicsDropShadowEffect,
 )
 
 from src.config import (
@@ -83,6 +84,38 @@ from src.go_tab import GoTroubleshootingTab
 
 
 _URL_TOKEN_RE = re.compile(r"(?:https?://|www\.)[^\s<>\"']+", re.IGNORECASE)
+
+
+class ButtonGlowFilter(QObject):
+    """Adds a violet (hover) / cyan-green (pressed) neon glow to QPushButtons."""
+
+    def __init__(self, root: QWidget) -> None:
+        super().__init__(root)
+        self._root = root
+
+    @staticmethod
+    def _apply(btn: QPushButton, color: str, blur: int) -> None:
+        eff = QGraphicsDropShadowEffect(btn)
+        eff.setOffset(0, 0)
+        eff.setBlurRadius(blur)
+        eff.setColor(QColor(color))
+        btn.setGraphicsEffect(eff)
+
+    def eventFilter(self, watched: QObject, event: QEvent) -> bool:
+        if isinstance(watched, QPushButton) and self._root.isAncestorOf(watched):
+            et = event.type()
+            if et in (QEvent.Type.Enter, QEvent.Type.HoverEnter) and watched.isEnabled():
+                self._apply(watched, COLORS["glow_violet"], 22)
+            elif et == QEvent.Type.MouseButtonPress and watched.isEnabled():
+                self._apply(watched, COLORS["glow_cyan"], 30)
+            elif et == QEvent.Type.MouseButtonRelease:
+                if watched.underMouse():
+                    self._apply(watched, COLORS["glow_violet"], 22)
+                else:
+                    watched.setGraphicsEffect(None)
+            elif et in (QEvent.Type.Leave, QEvent.Type.HoverLeave, QEvent.Type.Hide):
+                watched.setGraphicsEffect(None)
+        return False
 
 
 def normalize_link_target(raw_target: str) -> str:
@@ -845,7 +878,8 @@ class TimerRendezVousWidget(QWidget):
         app = QApplication.instance()
         if app is not None:
             app.installEventFilter(self)
-
+            self._button_glow_filter = ButtonGlowFilter(self)
+            app.installEventFilter(self._button_glow_filter)
     def _activate_tab_shortcut(self, index: int) -> None:
         if 0 <= index < self.main_tabs.count():
             self.main_tabs.setCurrentIndex(index)

@@ -96,6 +96,7 @@ Persisted to `data/scratchpad.json` via `Storage.load_scratchpad()` / `Storage.s
 
 ### 2.3 `COLORS` Dark Palette & `DARK_QSS` Selectors
 - **Surfaces & Borders**: `bg_dark` (`#111116`), `surface` (`#1a1a22`), `surface_light` (`#262632`), `border` (`#2e2e3d`).
+- **Button Glow Gradients**: `glow_violet` (`#8b5cf6`), `glow_violet_light` (`#a78bfa`), `glow_cyan` (`#22d3ee`), `glow_green` (`#34d399`) — all `QPushButton:hover` states fill violet ➔ cyan, `:pressed` states fill cyan ➔ green; `QTabBar::tab:hover` fills violet ➔ cyan and `QTabBar::tab:selected` fills cyan ➔ green.
 - **Typography**: `text` (`#f4f4f5`), `text_muted` (`#9ca3af`).
 - **Semantic Accents**: `accent` (`#6366f1`), `accent_hover` (`#4f46e5`), `accent_link` (`#38bdf8`), `accent_success` (`#10b981`), `accent_warning` (`#f59e0b`), `accent_danger` (`#ef4444`).
 - **QSS Semantic `objectName` IDs & Popup Menus** (applied via `widget.setObjectName(...)` or `DARK_QSS`):
