@@ -5,7 +5,8 @@
 
 ---
 
-## [v3.9] — Neon Gradient Button Glow (2026-11-09)
+## [v3.9] — Neon Gradient Button Glow & Countdown SpinBox Sizing (2026-11-09)
+- **Countdown Number Display Fix (`1. Timers ⏳`, `src/gui.py`)**: Enlarged `spin_h`, `spin_m`, and `spin_s` width bounds (`setMinimumWidth(75)`, `setMaximumWidth(110)`, up from the restrictive `maxWidth=62px` cap). This expands the internal `QLineEdit` from 13px to 48–54px (and 35–42px at minimum 480px window width), ensuring countdown numbers and suffixes (`0 h`, `15 m`, `0 s`) are fully visible and never clipped behind native spin stepper arrows.
 - **Violet ➔ Cyan Hover & Cyan ➔ Green Pressed Gradients (src/config.py, src/gui.py)**: Added glow_violet, glow_violet_light, glow_cyan, glow_green COLORS tokens and rewrote the QPushButton hover/pressed DARK_QSS rules (including #primaryBtn, #successBtn, #dangerBtn) with qlineargradient fills. Added ButtonGlowFilter(QObject) (src/gui.py) installed by TimerRendezVousWidget, applying a QGraphicsDropShadowEffect neon glow (violet on hover, cyan on press) to every QPushButton and removing it on leave.
 - **Gradient Tab Buttons (src/config.py)**: The 7 QTabBar::tab buttons now use a violet ➔ cyan gradient on hover and a cyan ➔ green gradient on the selected (clicked) tab. *(QTabBar tabs are not widgets, so they get the gradients but not the drop-shadow glow.)*
 
