@@ -28,7 +28,9 @@ TimeSpace/
 │   ├── settings.json          # Active AppConfig preferences
 │   ├── reminders.json         # Active ScheduledItem records
 │   ├── history.json           # Completed/triggered HistoryEntry log (max 100)
-│   └── scratchpad.json        # Auto-saved ScratchpadState time notes (plain text + rich HTML)
+│   ├── scratchpad.json        # Auto-saved ScratchpadState time notes (plain text + rich HTML)
+│   ├── hotstrings.json        # Saved AHKHotstringItem records for visual table editor
+│   └── hotstrings.ahk         # Compiled strict AutoHotkey v2 executable script
 ├── Docs/
 │   ├── ARCHITECTURE.md        # Dual-mode F7Hub runtime, concurrency & Win32 subsystems
 │   ├── STATE_AND_CONFIG.md    # Dataclasses, UI_DIMENSIONS, COLORS, DARK_QSS & JSON schemas
@@ -37,8 +39,8 @@ TimeSpace/
 │   └── CHANGELOG.md           # Chronological engineering & migration changelog
 └── src/
     ├── __init__.py            # Public package exports (__all__)
-    ├── config.py              # Constants, presets, DARK_QSS, AppConfig, HistoryEntry, ScratchpadState
-    ├── storage.py             # Storage class for JSON persistence
+    ├── config.py              # Constants, presets, DARK_QSS, AppConfig, HistoryEntry, ScratchpadState, AHKHotstringItem
+    ├── storage.py             # Storage class for JSON persistence & AHK script text
     ├── scheduler.py           # ScheduledItem dataclass & thread-safe ReminderScheduler
     ├── sound.py               # SoundPlayer (winsound presets + Windows MCI MP3/WAV)
     ├── hotkey_manager.py      # GlobalHotkeyListener (Win32 RegisterHotKey / WM_HOTKEY)
@@ -53,6 +55,8 @@ TimeSpace/
     ├── alarm_dialog.py        # AlarmDialog(QDialog) frameless bottom-right stacked toast card
     ├── mini_hud.py            # FloatingMiniHUD(QWidget) frameless draggable desktop pill
     ├── go_tab.py              # GoConsoleHighlighter & GoTroubleshootingTab(QWidget) non-blocking QProcess diagnostic launcher
+    ├── ahk_manager.py         # AHKProcessManager(QObject), find_ahk_v2_exe, generate_ahk_v2_script
+    ├── ahk_dialog.py          # AHKHotstringsDialog(QDialog) & AHKItemEditDialog(QDialog)
     └── gui.py                 # ScratchpadUrlHighlighter, ScratchpadEditor, SchedulerBridge, TimerRendezVousWidget & MainApp
 ```
 
@@ -65,7 +69,7 @@ TimeSpace/
 | `run.py` | `_ensure_pyside6_interpreter() -> None` | `src.gui.MainApp` | Verifies `PySide6` availability (re-executes via `.venv` if missing) and starts `MainApp`. |
 | `src/__init__.py` | Re-exports config tokens, dataclasses, `Storage`, `ReminderScheduler`, `ScheduledItem`, `GlobalHotkeyListener`, `GoTroubleshootingTab`, `TimerRendezVousWidget`, `MainApp` | `config`, `storage`, `scheduler`, `hotkey_manager`, `go_tab`, `gui` | Clean package facade for F7Hub or external callers. |
 | `src/config.py` | `COLORS`, `DARK_QSS`, `UI_DIMENSIONS`, `SOUND_PRESETS`, `CATEGORIES`, `QUICK_TIMER_PRESETS`, `SNOOZE_OPTIONS`, `SCRATCHPAD_TEXT_COLORS`, `GO_DIAG_ACTIONS`, `GO_TARGET_PRESETS`, `AppConfig`, `HistoryEntry`, `ScratchpadState` | *(None — leaf module)* | Single source of truth for styling, geometry, presets, and typed config/state dataclasses. |
-| `src/storage.py` | `Storage.load_config()`, `save_config()`, `load_reminders()`, `save_reminders()`, `load_history()`, `add_history_entry()`, `delete_history_indices()`, `clear_history()`, `load_scratchpad()`, `save_scratchpad()`, `default_report_path()`, `export_diagnostic_report()`, `export_scratchpad_note()` | `src.config` | Thread-tolerant JSON file I/O, diagnostic incident report export (`.md`, `.txt`, `.json`), and 1-click Scratchpad Markdown export (`C:\Temp`) with automatic directory creation. |
+| `src/storage.py` | `Storage.load_config()`, `save_config()`, `load_reminders()`, `save_reminders()`, `load_history()`, `add_history_entry()`, `delete_history_indices()`, `clear_history()`, `load_scratchpad()`, `save_scratchpad()`, `load_hotstrings()`, `save_hotstrings()`, `load_ahk_script_text()`, `save_ahk_script_text()`, `default_report_path()`, `export_diagnostic_report()`, `export_scratchpad_note()` | `src.config` | Thread-tolerant JSON file I/O, diagnostic incident report export (`.md`, `.txt`, `.json`), 1-click Scratchpad Markdown export (`C:\Temp`), and AutoHotkey v2 state persistence with automatic directory creation. |
 | `src/scheduler.py` | `ScheduledItem`, `ReminderScheduler(on_trigger_callback, on_wake_missed_callback)` (`add_item`, `get_item`, `update_item`, `remove_item`, `toggle_pause`, `get_nearest_item`, `get_active_timer`, `get_events_for_date`, `get_all_event_dates`) | `src.storage` | Background countdown & calendar scheduler with inline item updates, pause/resume, recurrence, and sleep-drift detection. |
 | `src/sound.py` | `SoundPlayer(config)` (`update_config`, `start_alarm`, `stop_alarm`, `start_preview`, `stop_preview`) | `src.config`, `src.storage` | Synthesized chime patterns and hardware-volume MCI playback. |
 | `src/hotkey_manager.py` | `GlobalHotkeyListener(hotkey_str, callback)` (`start()`, `stop()`) | *(None — Win32 leaf)* | Native Win32 `RegisterHotKey` listener thread with `keyboard` fallback. |
@@ -80,7 +84,9 @@ TimeSpace/
 | `src/alarm_dialog.py` | `AlarmDialog(master, title_text, reminder_name, on_dismiss, on_snooze, on_open_link, category, url, note, config)` (`set_active_popups_opacity`) | `src.config`, `src.notifications` | Frameless `350x132` / `350x162` bottom-right stacked popup card with Dismiss, optional `🔗 Open Link`, Note preview, and Snooze. |
 | `src/mini_hud.py` | `FloatingMiniHUD(master, on_toggle_pause, on_bring_main_to_front, on_close, initial_x, initial_y, opacity)` (`update_status`, `set_idle`, `set_hud_opacity`, `close_hud`) | `src.config` | Frameless `276x40` draggable always-on-top status pill with configurable opacity. |
 | `src/go_tab.py` | `GoConsoleHighlighter(QSyntaxHighlighter)`, `GoTroubleshootingTab(parent)` — Signals: `diagnostic_completed(dict)`, `sendToScratchpad(str)`, `customTargetsChanged(list)` (`run_diagnostic(action)`, `build_go_binaries()`, `launch_interactive_go_cli()`, `attach_scratchpad_widget()`, `set_custom_targets()`, `save_current_target_bookmark()`, `remove_current_target_bookmark()`, `copy_console_output()`, `send_console_to_scratchpad()`, `export_console_report()`, `stop_process()`, `clear_console()`) | `src.config`, `src.storage` | Non-blocking `QProcess` launcher for cross-platform Go diagnostic binaries (`bin/`), `go run .` (`go_engine/`), 1-click `build_all.ps1` compilation, custom target bookmarking (`[⭐]` / `[✕]` + `bm` REPL command), dedicated `[🛡️ Admin Go CLI]` and `[🚀 Standard Go CLI]` launchers, vertical `QSplitter` hosting the 3rd Rich-Text Scratchpad, report export, color-highlighted output, and async fallback worker. |
-| `src/gui.py` | `ButtonGlowFilter(QObject)`, `ScratchpadUrlHighlighter(QSyntaxHighlighter)`, `ScratchpadEditor(QTextEdit)` — Signals: `linkActivated(str)`, `scheduleContextRequested()`, `RichScratchpadPane(QWidget)` — Signals: `contentModified()`, `scheduleRequested(str, str, int)`, `HistoryListWidget(QListWidget)` — Signal: `deleteKeyPressed()`, `SchedulerBridge(QObject)`, `TimerRendezVousWidget(QWidget)`, `MainApp(QMainWindow)` | All `src.*` modules | Main UI composition, 7-tab workflow wiring, keys `1`–`7` tab shortcuts, header/settings window opacity sliders, inline active timer/RDV editing, 3 rich-text clickable-URL Scratchpads (with inline `Ctrl+F` search, `⏰` selection-to-Timer/RDV scheduling, and `💾` `C:\Temp` Markdown export), 1s `QTimer` refresh loop, and standalone shell (`480x540` min size). |
+| `src/ahk_manager.py` | `find_ahk_v2_exe(custom_path) -> Optional[str]`, `clean_hotstring_trigger(trig) -> str`, `normalize_hotstring_options(opts, is_expr) -> str`, `generate_ahk_v2_script(items) -> str`, `AHKProcessManager(QObject)` — Signals: `statusChanged(bool, int)`, `errorOccurred(str)`, `outputReceived(str)` (`start_script()`, `reload_script()`, `stop_script()`, `is_running()`, `get_pid()`) | `src.config` | Strict AutoHotkey v2 executable discovery, 100% compliant v2 code generation (`#Requires AutoHotkey v2.0+`), and background child process lifecycle management via `QProcess`. |
+| `src/ahk_dialog.py` | `AHKItemEditDialog(QDialog)`, `AHKHotstringsDialog(QDialog)` | `src.config`, `src.storage`, `src.ahk_manager` | Dual-mode AutoHotkey v2 text expanders manager: visual `QTableWidget` editor (search, add/edit/delete/dup, move, templates) and monospace `.ahk` script editor (`data/hotstrings.ahk`). |
+| `src/gui.py` | `ButtonGlowFilter(QObject)`, `ScratchpadUrlHighlighter(QSyntaxHighlighter)`, `ScratchpadEditor(QTextEdit)` — Signals: `linkActivated(str)`, `scheduleContextRequested()`, `RichScratchpadPane(QWidget)` — Signals: `contentModified()`, `scheduleRequested(str, str, int)`, `HistoryListWidget(QListWidget)` — Signal: `deleteKeyPressed()`, `SchedulerBridge(QObject)`, `TimerRendezVousWidget(QWidget)`, `MainApp(QMainWindow)` | All `src.*` modules | Main UI composition, 7-tab workflow wiring, keys `1`–`7` tab shortcuts, header/settings window opacity sliders, inline active timer/RDV editing, 3 rich-text clickable-URL Scratchpads, Settings AHK v2 text expanders group, 1s `QTimer` refresh loop, and standalone shell (`480x540` min size). |
 
 ---
 
@@ -100,10 +106,11 @@ MainApp (QMainWindow — standalone shell, minSize=480x540, opacity=AppConfig.ap
       │    ├── Tab 4 ("4. Scratchpad 📝"): Vertical QSplitter with Dual RichScratchpadPanes (Upper Scratchpad 1 + Lower Scratchpad 2; each with [𝐁], [🎨], [🕒], [🔍] Ctrl+F Find Bar, [⏰] Schedule Selection, [💾] Export to C:\Temp, [📋], [🧹] and clickable URLs)
       │    ├── Tab 5 ("5. Go ⏱️"): GoTroubleshootingTab (Engine Mode + [🔨], Target + Presets + [⭐] / [✕] Bookmarks + Args, 2x4 Action Grid, [🛡️ Admin Go CLI] + [🚀 Standard Go CLI], Progress + [📋] [📝] [💾] [⏹️] [🧹], Vertical QSplitter: Live Console + 3rd RichScratchpadPane)
       │    ├── Tab 6 ("6. History 📜"): Full-height HistoryListWidget (Delete key or [🗑️] removes selected items, [🔗], [📋], [🧹])
-      │    └── Tab 7 ("7. Settings ⚙️"): Alarm Tone + [🔊], Master Volume, App Transparency QSlider (45–100%, synced with Header), Popup & HUD Opacity QSlider (60–100%), Audio File [📂], Escalation, Boot Startup, Snooze, [💾]
+      │    └── Tab 7 ("7. Settings ⚙️"): Alarm Tone + [🔊], Master Volume, App Transparency QSlider (45–100%, synced with Header), Popup & HUD Opacity QSlider (60–100%), Audio File [📂], Escalation, Boot Startup, Snooze, [💾], ⌨️ AutoHotkey v2 Text Expanders Group ([⚡ Set Up & Edit AHK v2 Hotstrings...], [▶️ Run], [⏹️ Stop], Auto-start Checkbox)
       ├── Active Reminders Queue (QGroupBox, visible on Tabs 1, 2, 7; hidden on Tabs 3, 4, 5, 6):
       │    └── Queue status + [⏸️] + [✏️] + [🗑️] + multi-row QListWidget (double-click any item to edit inline)
       └── Top-Level Overlays (spawned on demand, controlled by AppConfig.overlay_opacity):
            ├── FloatingMiniHUD (QWidget, frameless always-on-top)
-           └── AlarmDialog (QDialog, frameless bottom-right dynamic-height vertical stack)
+           ├── AlarmDialog (QDialog, frameless bottom-right dynamic-height vertical stack)
+           └── AHKHotstringsDialog (QDialog, dual-mode visual table & v2 code editor)
 ```

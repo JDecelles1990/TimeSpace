@@ -81,6 +81,9 @@ from src.alarm_dialog import AlarmDialog
 from src.mini_hud import FloatingMiniHUD
 from src.hotkey_manager import GlobalHotkeyListener
 from src.go_tab import GoTroubleshootingTab
+from src.ahk_manager import AHKProcessManager, find_ahk_v2_exe, generate_ahk_v2_script
+from src.ahk_dialog import AHKHotstringsDialog
+from src.storage import DEFAULT_AHK_SCRIPT_FILE
 
 
 _URL_TOKEN_RE = re.compile(r"(?:https?://|www\.)[^\s<>\"']+", re.IGNORECASE)
@@ -634,6 +637,12 @@ class TimerRendezVousWidget(QWidget):
         self._scratchpad_save_timer.setInterval(600)
         self._scratchpad_save_timer.timeout.connect(self._save_scratchpad_now)
 
+        # AutoHotkey v2 Process Manager
+        self.ahk_manager = AHKProcessManager(self)
+        self.ahk_manager.statusChanged.connect(self._on_ahk_status_changed)
+        self.ahk_manager.errorOccurred.connect(self._on_ahk_error)
+        self.ahk_dialog: Optional[AHKHotstringsDialog] = None
+
         # Build UI Layout
         self._activity_timer_items: List[ScheduledItem] = []
         self._activity_rdv_items: List[ScheduledItem] = []
@@ -656,6 +665,8 @@ class TimerRendezVousWidget(QWidget):
         QTimer.singleShot(600, self._check_missed_alarms)
         if self.hud_enabled:
             QTimer.singleShot(800, self._show_hud)
+        if self.app_config.ahk_auto_start:
+            QTimer.singleShot(1200, self._auto_start_ahk_script)
 
     # ── Background Thread Callbacks (Emit via Bridge) ────────────────────────
 
@@ -1598,6 +1609,62 @@ class TimerRendezVousWidget(QWidget):
         s_layout.addLayout(row_bottom)
 
         layout.addWidget(s_group)
+
+        # ── Group 2: AutoHotkey v2 Text Expanders (Hotstrings) ──
+        ahk_group = QGroupBox("⌨️ AutoHotkey v2 Text Expanders (Hotstrings)")
+        ahk_layout = QVBoxLayout(ahk_group)
+        ahk_layout.setContentsMargins(6, 6, 6, 6)
+        ahk_layout.setSpacing(6)
+
+        ahk_top_row = QHBoxLayout()
+        ahk_top_row.setSpacing(6)
+
+        btn_open_ahk = QPushButton("⚡ Set Up & Edit AHK v2 Hotstrings...")
+        btn_open_ahk.setObjectName("primaryBtn")
+        btn_open_ahk.setFixedHeight(28)
+        btn_open_ahk.setCursor(Qt.CursorShape.PointingHandCursor)
+        btn_open_ahk.setToolTip("Open AutoHotkey v2 Hotstrings & Text Expanders Manager")
+        btn_open_ahk.clicked.connect(self._open_ahk_manager_dialog)
+        ahk_top_row.addWidget(btn_open_ahk)
+
+        self.lbl_ahk_settings_status = QLabel("AHK v2: Checking...")
+        self.lbl_ahk_settings_status.setStyleSheet("font-size: 11px;")
+        ahk_top_row.addWidget(self.lbl_ahk_settings_status, 1)
+
+        self.btn_ahk_quick_run = QPushButton("▶️ Run")
+        self.btn_ahk_quick_run.setFixedHeight(28)
+        self.btn_ahk_quick_run.setMinimumWidth(80)
+        self.btn_ahk_quick_run.setToolTip("Run or reload AutoHotkey v2 hotstrings script")
+        self.btn_ahk_quick_run.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_ahk_quick_run.clicked.connect(self._quick_run_ahk_script)
+        ahk_top_row.addWidget(self.btn_ahk_quick_run)
+
+        self.btn_ahk_quick_stop = QPushButton("⏹️ Stop")
+        self.btn_ahk_quick_stop.setFixedHeight(28)
+        self.btn_ahk_quick_stop.setMinimumWidth(70)
+        self.btn_ahk_quick_stop.setObjectName("dangerBtn")
+        self.btn_ahk_quick_stop.setToolTip("Stop active AutoHotkey v2 hotstrings script")
+        self.btn_ahk_quick_stop.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_ahk_quick_stop.clicked.connect(self._quick_stop_ahk_script)
+        ahk_top_row.addWidget(self.btn_ahk_quick_stop)
+
+        ahk_layout.addLayout(ahk_top_row)
+
+        ahk_opt_row = QHBoxLayout()
+        self.chk_ahk_auto_start = QCheckBox("Auto-run hotstrings script on TimeSpace launch")
+        self.chk_ahk_auto_start.setChecked(self.app_config.ahk_auto_start)
+        self.chk_ahk_auto_start.toggled.connect(self._on_ahk_auto_start_toggled)
+        ahk_opt_row.addWidget(self.chk_ahk_auto_start)
+        ahk_opt_row.addStretch()
+
+        lbl_ahk_script_hint = QLabel("Script: data/hotstrings.ahk")
+        lbl_ahk_script_hint.setStyleSheet(f"color: {COLORS['text_muted']}; font-size: 11px;")
+        ahk_opt_row.addWidget(lbl_ahk_script_hint)
+
+        ahk_layout.addLayout(ahk_opt_row)
+        layout.addWidget(ahk_group)
+
+        self._update_ahk_settings_status_label()
         layout.addStretch()
 
     # ── Bottom Active Queue (Visible on Tabs 1, 2, 7; Hidden on 3, 4, 5, 6) ──
@@ -2411,6 +2478,8 @@ class TimerRendezVousWidget(QWidget):
         self.app_config.default_snooze_minutes = int(self.combo_snooze.currentData() or 5)
         self.app_config.gradual_escalation = self.chk_escalate.isChecked()
         self.app_config.start_on_boot = self.chk_startup.isChecked()
+        if hasattr(self, "chk_ahk_auto_start"):
+            self.app_config.ahk_auto_start = self.chk_ahk_auto_start.isChecked()
 
         Storage.save_config(self.app_config)
         self.sound_player.update_config(self.app_config)
@@ -2420,6 +2489,62 @@ class TimerRendezVousWidget(QWidget):
 
         self.lbl_settings_saved.setText("✅ Saved!")
         QTimer.singleShot(3000, lambda: self.lbl_settings_saved.setText(""))
+
+    # ── AutoHotkey v2 Text Expanders Controller ──────────────────────────────
+
+    def _update_ahk_settings_status_label(self) -> None:
+        if not hasattr(self, "lbl_ahk_settings_status"):
+            return
+        exe = find_ahk_v2_exe(self.app_config.ahk_v2_exe_path)
+        if not exe:
+            self.lbl_ahk_settings_status.setText("⚠️ AHK v2 Not Found")
+            self.lbl_ahk_settings_status.setStyleSheet(f"color: {COLORS['accent_danger']}; font-size: 11px;")
+        elif self.ahk_manager.is_running():
+            pid = self.ahk_manager.get_pid()
+            self.lbl_ahk_settings_status.setText(f"🟢 Running (PID: {pid})")
+            self.lbl_ahk_settings_status.setStyleSheet(f"color: {COLORS['accent_success']}; font-weight: bold; font-size: 11px;")
+        else:
+            self.lbl_ahk_settings_status.setText(f"⚪ Ready ({os.path.basename(exe)}) • Stopped")
+            self.lbl_ahk_settings_status.setStyleSheet(f"color: {COLORS['text_muted']}; font-size: 11px;")
+
+    def _on_ahk_status_changed(self, running: bool, pid: int) -> None:
+        self._update_ahk_settings_status_label()
+
+    def _on_ahk_error(self, err: str) -> None:
+        self._update_ahk_settings_status_label()
+
+    def _on_ahk_auto_start_toggled(self, checked: bool) -> None:
+        self.app_config.ahk_auto_start = checked
+        Storage.save_config(self.app_config)
+
+    def _auto_start_ahk_script(self) -> None:
+        script_file = self.app_config.ahk_script_path or DEFAULT_AHK_SCRIPT_FILE
+        if not os.path.exists(script_file):
+            items = Storage.load_hotstrings()
+            code = generate_ahk_v2_script(items)
+            Storage.save_ahk_script_text(code, script_file)
+        self.ahk_manager.start_script(script_file, self.app_config.ahk_v2_exe_path)
+
+    def _quick_run_ahk_script(self) -> None:
+        script_file = self.app_config.ahk_script_path or DEFAULT_AHK_SCRIPT_FILE
+        if not os.path.exists(script_file):
+            items = Storage.load_hotstrings()
+            code = generate_ahk_v2_script(items)
+            Storage.save_ahk_script_text(code, script_file)
+        self.ahk_manager.start_script(script_file, self.app_config.ahk_v2_exe_path)
+
+    def _quick_stop_ahk_script(self) -> None:
+        self.ahk_manager.stop_script()
+
+    def _open_ahk_manager_dialog(self) -> None:
+        if self.ahk_dialog is None or not self.ahk_dialog.isVisible():
+            self.ahk_dialog = AHKHotstringsDialog(self, self.app_config, self.ahk_manager)
+            self.ahk_dialog.show()
+            self.ahk_dialog.raise_()
+            self.ahk_dialog.activateWindow()
+        else:
+            self.ahk_dialog.raise_()
+            self.ahk_dialog.activateWindow()
 
     # ── Mini HUD Controller ──────────────────────────────────────────────────
 
@@ -2808,6 +2933,8 @@ class MainApp(QMainWindow):
             self._hotkey_listener.stop()
         if self.module_widget.hud:
             self.module_widget.hud.close()
+        if hasattr(self.module_widget, "ahk_manager") and self.module_widget.ahk_manager.is_running():
+            self.module_widget.ahk_manager.stop_script()
         self.tray.stop()
         self._qt_app.quit()
 

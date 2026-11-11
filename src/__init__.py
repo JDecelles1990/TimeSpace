@@ -18,11 +18,15 @@ from src.config import (
     AppConfig,
     HistoryEntry,
     ScratchpadState,
+    AHKHotstringItem,
+    DEFAULT_AHK_HOTSTRINGS,
 )
 from src.storage import Storage
 from src.scheduler import ReminderScheduler, ScheduledItem
 from src.hotkey_manager import GlobalHotkeyListener
 from src.go_tab import GoTroubleshootingTab
+from src.ahk_manager import AHKProcessManager, find_ahk_v2_exe, generate_ahk_v2_script
+from src.ahk_dialog import AHKHotstringsDialog, AHKItemEditDialog
 from src.gui import TimerRendezVousWidget, TimeSpaceWidget, MainApp
 
 __all__ = [
@@ -49,6 +53,13 @@ __all__ = [
     "ScheduledItem",
     "GlobalHotkeyListener",
     "GoTroubleshootingTab",
+    "AHKHotstringItem",
+    "DEFAULT_AHK_HOTSTRINGS",
+    "AHKProcessManager",
+    "find_ahk_v2_exe",
+    "generate_ahk_v2_script",
+    "AHKHotstringsDialog",
+    "AHKItemEditDialog",
     "TimerRendezVousWidget",
     "TimeSpaceWidget",
     "MainApp",

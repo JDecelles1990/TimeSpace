@@ -6,7 +6,7 @@ import platform
 import re
 import sys
 from typing import Dict, Any, List, Optional, Union
-from src.config import AppConfig, HistoryEntry, ScratchpadState
+from src.config import AppConfig, HistoryEntry, ScratchpadState, AHKHotstringItem, DEFAULT_AHK_HOTSTRINGS
 
 DATA_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data")
 REPORTS_DIR = r"C:\Temp" if sys.platform == "win32" else "/tmp"
@@ -14,6 +14,8 @@ SETTINGS_FILE = os.path.join(DATA_DIR, "settings.json")
 REMINDERS_FILE = os.path.join(DATA_DIR, "reminders.json")
 HISTORY_FILE = os.path.join(DATA_DIR, "history.json")
 SCRATCHPAD_FILE = os.path.join(DATA_DIR, "scratchpad.json")
+HOTSTRINGS_FILE = os.path.join(DATA_DIR, "hotstrings.json")
+DEFAULT_AHK_SCRIPT_FILE = os.path.join(DATA_DIR, "hotstrings.ahk")
 
 
 class Storage:
@@ -283,3 +285,58 @@ class Storage:
         with open(dest, "w", encoding="utf-8") as f:
             f.write(body)
         return os.path.abspath(dest)
+
+    # ── AutoHotkey v2 Hotstrings ──────────────────────────────────────────────
+
+    @classmethod
+    def load_hotstrings(cls) -> List[AHKHotstringItem]:
+        """Load hotstring items from data/hotstrings.json, seeding defaults if missing."""
+        cls._ensure_dir()
+        if not os.path.exists(HOTSTRINGS_FILE):
+            default_items = [AHKHotstringItem.from_dict(d) for d in DEFAULT_AHK_HOTSTRINGS]
+            cls.save_hotstrings(default_items)
+            return default_items
+        try:
+            with open(HOTSTRINGS_FILE, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            if isinstance(data, list):
+                items = [AHKHotstringItem.from_dict(d) for d in data if isinstance(d, dict)]
+                return items or [AHKHotstringItem.from_dict(d) for d in DEFAULT_AHK_HOTSTRINGS]
+            return [AHKHotstringItem.from_dict(d) for d in DEFAULT_AHK_HOTSTRINGS]
+        except Exception:
+            return [AHKHotstringItem.from_dict(d) for d in DEFAULT_AHK_HOTSTRINGS]
+
+    @classmethod
+    def save_hotstrings(cls, items: List[AHKHotstringItem]) -> None:
+        """Persist hotstring items to data/hotstrings.json."""
+        cls._ensure_dir()
+        payload = [it.to_dict() for it in items]
+        try:
+            with open(HOTSTRINGS_FILE, "w", encoding="utf-8") as f:
+                json.dump(payload, f, indent=2, ensure_ascii=False)
+        except Exception:
+            pass
+
+    @classmethod
+    def load_ahk_script_text(cls, filepath: Optional[str] = None) -> str:
+        """Load the raw text of the .ahk script file."""
+        target = filepath or DEFAULT_AHK_SCRIPT_FILE
+        if not os.path.exists(target):
+            return ""
+        try:
+            with open(target, "r", encoding="utf-8") as f:
+                return f.read()
+        except Exception:
+            return ""
+
+    @classmethod
+    def save_ahk_script_text(cls, text: str, filepath: Optional[str] = None) -> str:
+        """Save text into the .ahk script file and return its absolute path."""
+        target = filepath or DEFAULT_AHK_SCRIPT_FILE
+        target_dir = os.path.dirname(target)
+        if target_dir:
+            os.makedirs(target_dir, exist_ok=True)
+        with open(target, "w", encoding="utf-8") as f:
+            f.write(text)
+        return os.path.abspath(target)
+

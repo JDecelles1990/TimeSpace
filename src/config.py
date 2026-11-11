@@ -376,6 +376,9 @@ class AppConfig:
     overlay_opacity: int = 90
     app_opacity: int = 90
     custom_go_targets: List[Dict[str, str]] = field(default_factory=list)
+    ahk_v2_exe_path: str = ""
+    ahk_script_path: str = ""
+    ahk_auto_start: bool = False
 
     def to_dict(self) -> Dict[str, Any]:
         return asdict(self)
@@ -463,3 +466,89 @@ class ScratchpadState:
             go_html=str(data.get("go_html", "") or ""),
             updated_at=str(data.get("updated_at", "") or ""),
         )
+
+
+@dataclass
+class AHKHotstringItem:
+    """Typed record for an AutoHotkey v2 hotstring text expander."""
+    trigger: str
+    replacement: str
+    options: str = ""
+    is_expression: bool = False
+    enabled: bool = True
+    description: str = ""
+
+    def to_dict(self) -> Dict[str, Any]:
+        return asdict(self)
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "AHKHotstringItem":
+        return cls(
+            trigger=str(data.get("trigger", "") or "").strip(),
+            replacement=str(data.get("replacement", "") or ""),
+            options=str(data.get("options", "") or "").strip(),
+            is_expression=bool(data.get("is_expression", False)),
+            enabled=bool(data.get("enabled", True)),
+            description=str(data.get("description", "") or "").strip(),
+        )
+
+
+DEFAULT_AHK_HOTSTRINGS: List[Dict[str, Any]] = [
+    {
+        "trigger": "btw",
+        "replacement": "by the way",
+        "options": "",
+        "is_expression": False,
+        "enabled": True,
+        "description": "Standard expansion",
+    },
+    {
+        "trigger": "omw",
+        "replacement": "on my way",
+        "options": "*",
+        "is_expression": False,
+        "enabled": True,
+        "description": "Instant trigger without space",
+    },
+    {
+        "trigger": "dts",
+        "replacement": 'SendText(FormatTime(, "yyyy-MM-dd HH:mm:ss"))',
+        "options": "X",
+        "is_expression": True,
+        "enabled": True,
+        "description": "Current dynamic timestamp (YYYY-MM-DD HH:mm:ss)",
+    },
+    {
+        "trigger": "ds",
+        "replacement": 'SendText(FormatTime(, "yyyy-MM-dd"))',
+        "options": "X",
+        "is_expression": True,
+        "enabled": True,
+        "description": "Current dynamic date (YYYY-MM-DD)",
+    },
+    {
+        "trigger": "tyvm",
+        "replacement": "thank you very much!",
+        "options": "*",
+        "is_expression": False,
+        "enabled": True,
+        "description": "Quick courtesy note",
+    },
+    {
+        "trigger": "@m",
+        "replacement": "user@company.com",
+        "options": "?",
+        "is_expression": False,
+        "enabled": True,
+        "description": "Email address (triggers inside words)",
+    },
+    {
+        "trigger": "sig",
+        "replacement": "Best regards,\nIT Support Team\nTimeSpace Workspace",
+        "options": "T",
+        "is_expression": False,
+        "enabled": True,
+        "description": "Multi-line email / message signature",
+    },
+]
+

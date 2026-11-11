@@ -27,6 +27,9 @@ Persisted to `data/settings.json` via `Storage.load_config() -> AppConfig` and `
 | `overlay_opacity` | `int` | `90` | Window opacity percentage (`60`–`100`, clamped on load) applied to `FloatingMiniHUD` and `AlarmDialog` cards. |
 | `app_opacity` | `int` | `90` | Main application window opacity percentage (`45`–`100`, default `90`, clamped on load) controlled by the synchronized Top Header opacity slider (`slider_header_opacity`) and Settings App Transparency slider (`slider_app_opacity`). |
 | `custom_go_targets` | `List[Dict[str, str]]` | `[]` | User-saved favorite diagnostic target bookmarks (`{"label": ..., "host": ...}`) displayed at the top of the `5. Go ⏱️` presets dropdown (`⭐ Label (host)`) and accessible in the Interactive Go CLI via `bm`. |
+| `ahk_v2_exe_path` | `str` | `""` | Custom path to AutoHotkey v2 executable (`AutoHotkey64.exe` / `AutoHotkey.exe`); empty defaults to auto-detected installation under `C:\Program Files\AutoHotkey\v2\`. |
+| `ahk_script_path` | `str` | `""` | Custom path to generated `.ahk` script; empty defaults to `data/hotstrings.ahk`. |
+| `ahk_auto_start` | `bool` | `False` | Automatically launches the AutoHotkey v2 hotstrings script on TimeSpace startup. |
 
 ### 1.2 `ScheduledItem` (`src/scheduler.py`)
 Persisted as a JSON array in `data/reminders.json` via `Storage.load_reminders()` / `Storage.save_reminders()`. Protected in memory by `ReminderScheduler._lock`.
@@ -74,6 +77,18 @@ Persisted to `data/scratchpad.json` via `Storage.load_scratchpad()` / `Storage.s
 | `go_html` | `str` | `""` | Rich-text HTML of the 3rd Go Scratchpad in Tab 5 (`5. Go ⏱️`). |
 | `updated_at` | `str` | `""` | Last auto-save time (`"%H:%M:%S"`) displayed in the Scratchpad toolbars. |
 
+### 1.5 `AHKHotstringItem` (`src/config.py`)
+Persisted as a JSON array in `data/hotstrings.json` via `Storage.load_hotstrings()` / `Storage.save_hotstrings(items)` and compiled to `data/hotstrings.ahk` via `generate_ahk_v2_script()`.
+
+| Field | Type | Default | Purpose |
+|---|---|---|---|
+| `trigger` | `str` | — | Abbreviation keyword (leading/trailing colons stripped automatically, e.g. `btw`, `dts`, `sig`). |
+| `replacement` | `str` | — | Expansion text or AutoHotkey v2 function call (e.g. `'SendText(FormatTime(, "yyyy-MM-dd"))'`). |
+| `options` | `str` | `""` | Valid AutoHotkey v2 hotstring option flags (`*` instant, `?` inside words, `c` case-sensitive, `T` raw text mode, `X` expression/function execution, `O` omit ending char). |
+| `is_expression` | `bool` | `False` | Whether replacement contains an executable AutoHotkey v2 expression/function (auto-enables `X` option). |
+| `enabled` | `bool` | `True` | Whether hotstring is active (disabled hotstrings are commented out in the generated `.ahk` script). |
+| `description` | `str` | `""` | Optional memo / usage note displayed in the visual table. |
+
 ---
 
 ## 2. Application Constants, Geometry & Domain Presets (`src/config.py`)
@@ -114,6 +129,7 @@ Persisted to `data/scratchpad.json` via `Storage.load_scratchpad()` / `Storage.s
 - `SCRATCHPAD_TEXT_COLORS`: `[("Default (White)", "#f4f4f5"), ("Indigo Accent", "#818cf8"), ("Sky Cyan", "#38bdf8"), ("Emerald Green", "#34d399"), ("Amber Gold", "#fbbf24"), ("Coral Orange", "#fb923c"), ("Crimson Red", "#f87171"), ("Violet Purple", "#c084fc")]`
 - `GO_DIAG_ACTIONS`: `[("🌐 Ping & TCP Reach", "ping"), ("🔍 Port Scan", "port-scan"), ("🔒 TLS Cert Check", "tls-check"), ("🌍 HTTP/S Probe", "http-check"), ("🧭 DNS Lookup", "dns-lookup"), ("🧹 Flush DNS", "flush-dns"), ("🖧 Net Stack Triage", "net-status"), ("📊 Uptime & Sockets", "sys-info")]`
 - `GO_TARGET_PRESETS`: `[("Cloudflare DNS (1.1.1.1)", "1.1.1.1"), ("Google DNS (8.8.8.8)", "8.8.8.8"), ("GitHub (github.com)", "github.com"), ("Google (google.com)", "google.com"), ("Microsoft (microsoft.com)", "microsoft.com"), ("Localhost (127.0.0.1)", "127.0.0.1")]`
+- `DEFAULT_AHK_HOTSTRINGS`: Built-in starter hotstring presets (`::btw`, `:*:omw`, `:X:dts`, `:X:ds`, `:*:tyvm`, `:?:@m`, `:T:sig`).
 - `SLA_PRESETS`: `[]` *(emptied intentionally; kept as an exported symbol for package backward compatibility).*
 
 ---
@@ -125,5 +141,7 @@ All runtime state is stored locally in `data/` (auto-created on first call via `
 - `data/reminders.json` — Array of active `ScheduledItem` dicts.
 - `data/history.json` — Array of `HistoryEntry` dicts (max 100).
 - `data/scratchpad.json` — `ScratchpadState` object.
+- `data/hotstrings.json` — Array of `AHKHotstringItem` objects for the visual table manager.
+- `data/hotstrings.ahk` — Auto-generated strict AutoHotkey v2 executable script.
 
 *Note*: `Storage.load_settings()` and `Storage.save_settings()` remain as thin compatibility wrappers around `load_config()` and `save_config()`, and `save_config` / `add_history_entry` / `save_scratchpad` accept either typed dataclasses or plain `dict` instances.

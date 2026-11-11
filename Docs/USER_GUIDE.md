@@ -97,13 +97,21 @@
 - Automatically hides the bottom `Active Reminders Queue` so the Completed & Triggered Reminders History list expands to full vertical height.
 - Press the **`Delete`** key (or click **`🗑️`**) to remove selected individual history entries, or use **`🔗`** (Open Link), **`📋`** (Copy Selected), and **`🧹`** (Clear All History).
 
-### Tab 7 — `7. Settings ⚙️` (Audio, Transparency & System Preferences)
+### Tab 7 — `7. Settings ⚙️` (Audio, Transparency, System Preferences & AHK v2 Expanders)
 - Automatically hides the top Hero Deck to provide extra vertical room for settings.
 - **Alarm Tone & `🔊`**: Audition built-in synthesized patterns or click **`📂`** to browse for a custom `.mp3` / `.wav` file.
 - **Master Volume (`0–100%`)**: Hardware-scaled alarm loudness.
 - **App Transparency (`45–100%`, default `90%`)**: Controls overall TimeSpace main window opacity, synchronized live with the **`🔆` Opacity Slider** in the top header bar.
 - **Popup & HUD Opacity (`60–100%`, default `90%`)**: Controls transparency of the **Floating Mini HUD** and **Bottom-Right Alarm Popups**.
 - **System Options**: Toggle **Gradual volume escalation**, **Launch at Windows boot**, choose your **Default Snooze**, and click **`💾`**.
+- **⌨️ AutoHotkey v2 Text Expanders (Hotstrings)**:
+  - Click **`⚡ Set Up & Edit AHK v2 Hotstrings...`** to open the dedicated pop-up manager.
+  - **Quick Controls**: **`▶️ Run`** / **`⏹️ Stop`** active hotstrings directly from Settings, and check **`☑️ Auto-run hotstrings script on TimeSpace launch`**.
+  - **Pop-up Window Features**:
+    - **Visual Hotstrings Table**: Add, edit, duplicate, reorder, search/filter, and enable/disable hotstrings.
+    - **Options**: `[*]` Instant expansion (no space/enter needed), `[?]` Trigger inside words, `[c]` Case-sensitive, `[T]` Raw text mode, `[X]` AutoHotkey v2 function/expression execution, `[O]` Omit ending character.
+    - **Templates (`⚡ Presets`)**: 1-click insertion of dynamic timestamps (`:X:dts -> YYYY-MM-DD HH:mm:ss`), dynamic dates (`:X:ds`), email signatures, localhost prefixes, and ticket replies.
+    - **AHK v2 Script Editor (`data/hotstrings.ahk`)**: Strict v2 code preview with `#Requires AutoHotkey v2.0+` and `#SingleInstance Force`, with **`🔄 Regenerate from Table`**, **`💾 Save Script File`**, and **`📋 Copy Script`**.
 
 ---
 

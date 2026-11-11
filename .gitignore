@@ -27,6 +27,8 @@ data/reminders.json
 data/settings.json
 data/history.json
 data/scratchpad.json
+data/hotstrings.json
+data/hotstrings.ahk
 !data/.gitkeep
 !data/settings.example.json
 reports/

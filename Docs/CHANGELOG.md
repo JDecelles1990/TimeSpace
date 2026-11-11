@@ -5,6 +5,22 @@
 
 ---
 
+## [v3.10] — AutoHotkey v2 Hotstrings Text Expanders Manager (2026-11-11)
+- **AutoHotkey v2 Hotstrings Manager Dialog (`src/ahk_dialog.py`, `src/ahk_manager.py`)**:
+  - Added `AHKHotstringsDialog(QDialog)` pop-up window launched from `7. Settings ⚙️` via **`⚡ Set Up & Edit AHK v2 Hotstrings...`**.
+  - **Visual Hotstrings Table (`QTableWidget`)**: Filter/search bar, add/edit/delete/duplicate/reorder rows, interactive inline enable/disable checkboxes, and preset template dropdown (`📅 Date`, `🕒 Timestamp`, `📧 Signature`, `🌐 Localhost`, `💼 Ticket Reply`, `🔤 Lorem Ipsum`).
+  - **Granular AHK v2 Option Toggles (`AHKItemEditDialog`)**: Checkboxes for `*` (instant trigger without ending character), `?` (trigger inside words), `c` (case-sensitive), `T` (raw text mode), `X` (AHK v2 function execution), and `O` (omit ending character).
+  - **Strict AHK v2 Code Generator (`src/ahk_manager.py`)**: Generates 100% compliant AutoHotkey v2 scripts (`data/hotstrings.ahk`) with `#Requires AutoHotkey v2.0+`, `#SingleInstance Force`, `SetWorkingDir A_InitialWorkingDir`, `SendText()`, multi-line continuation sections `(...)`, and zero legacy v1 syntax.
+  - **AHK v2 Script Editor Pane**: Monospace code editor with **`🔄 Regenerate from Table`**, **`💾 Save Script File`**, and **`📋 Copy Script`**.
+  - **Header Layout & Button Geometry Fix (`src/ahk_dialog.py`, `src/gui.py`)**: Enlarged `▶️ Run / Reload`, `⏹️ Stop`, `📂 Open Script Folder`, and `⚙️ AHK Path` buttons to `32px` height with generous horizontal bounds (`minWidth=80–160px`) and `4px 12px` padding, aligned into a dedicated action bar alongside the status pill to eliminate vertical text clipping and horizontal overflow across all DPI scales.
+- **Process Management & Settings Integration (`src/ahk_manager.py`, `src/gui.py`, `src/config.py`, `src/storage.py`)**:
+  - Added `find_ahk_v2_exe()` auto-detecting `C:\Program Files\AutoHotkey\v2\AutoHotkey64.exe` (and standard Windows v2 install paths) while avoiding legacy v1 paths, plus custom path browsing.
+  - Added `AHKProcessManager(QObject)` using non-blocking `QProcess` to run, reload, and stop the AHK v2 script process with live status badges (`🟢 Running (PID: xxxx)` / `⚪ Stopped`).
+  - Added `⌨️ AutoHotkey v2 Text Expanders (Hotstrings)` group to `7. Settings ⚙️` with quick **`▶️ Run`**, **`⏹️ Stop`**, and **`☑️ Auto-run hotstrings script on TimeSpace launch`** (`AppConfig.ahk_auto_start`).
+  - Clean child process termination in `MainApp.quit_app`.
+
+---
+
 ## [v3.9] — Neon Gradient Button Glow & Countdown SpinBox Sizing (2026-11-09)
 - **Countdown Number Display Fix (`1. Timers ⏳`, `src/gui.py`)**: Enlarged `spin_h`, `spin_m`, and `spin_s` width bounds (`setMinimumWidth(75)`, `setMaximumWidth(110)`, up from the restrictive `maxWidth=62px` cap). This expands the internal `QLineEdit` from 13px to 48–54px (and 35–42px at minimum 480px window width), ensuring countdown numbers and suffixes (`0 h`, `15 m`, `0 s`) are fully visible and never clipped behind native spin stepper arrows.
 - **Violet ➔ Cyan Hover & Cyan ➔ Green Pressed Gradients (src/config.py, src/gui.py)**: Added glow_violet, glow_violet_light, glow_cyan, glow_green COLORS tokens and rewrote the QPushButton hover/pressed DARK_QSS rules (including #primaryBtn, #successBtn, #dangerBtn) with qlineargradient fills. Added ButtonGlowFilter(QObject) (src/gui.py) installed by TimerRendezVousWidget, applying a QGraphicsDropShadowEffect neon glow (violet on hover, cyan on press) to every QPushButton and removing it on leave.
