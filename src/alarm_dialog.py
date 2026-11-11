@@ -33,6 +33,7 @@ class AlarmDialog(QDialog):
         url: str = "",
         note: str = "",
         config: Optional[AppConfig] = None,
+        meeting_mode: bool = False,
     ):
         super().__init__(master)
         self.on_dismiss = on_dismiss
@@ -42,6 +43,7 @@ class AlarmDialog(QDialog):
         self.url: str = (url or "").strip()
         self.note: str = (note or "").strip()
         self.config: AppConfig = config or AppConfig()
+        self.meeting_mode: bool = meeting_mode
         self.default_snooze: int = self.config.default_snooze_minutes
         self._drag_pos: Optional[QPoint] = None
 
@@ -117,6 +119,16 @@ class AlarmDialog(QDialog):
             f"font-size: 10px; font-weight: bold; padding: 2px 6px; border-radius: 3px; border: none;"
         )
         top_row.addWidget(lbl_badge)
+
+        if self.meeting_mode:
+            lbl_muted = QLabel("🤫 MUTED")
+            lbl_muted.setStyleSheet(
+                f"background-color: {COLORS['surface_light']}; color: {COLORS['glow_cyan']}; "
+                f"font-size: 10px; font-weight: bold; padding: 2px 6px; border-radius: 3px; border: none;"
+            )
+            lbl_muted.setToolTip("Meeting Mode is active: audio chime was suppressed.")
+            top_row.addWidget(lbl_muted)
+
         top_row.addStretch()
 
         btn_close = QPushButton("✕")

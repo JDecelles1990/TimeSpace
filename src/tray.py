@@ -11,11 +11,13 @@ class TrayManager:
         on_exit: Callable[[], None],
         on_toggle_pause: Optional[Callable[[], None]] = None,
         on_toggle_hud: Optional[Callable[[], None]] = None,
+        on_toggle_meeting_mode: Optional[Callable[[], None]] = None,
     ):
         self.on_toggle = on_toggle
         self.on_exit = on_exit
         self.on_toggle_pause = on_toggle_pause
         self.on_toggle_hud = on_toggle_hud
+        self.on_toggle_meeting_mode = on_toggle_meeting_mode
         self.icon = None
 
     def start(self) -> None:
@@ -54,6 +56,8 @@ class TrayManager:
                 menu_items.append(item("⏯️ Pause / Resume Active Timer", lambda: self.on_toggle_pause()))
             if self.on_toggle_hud:
                 menu_items.append(item("📌 Toggle Mini HUD", lambda: self.on_toggle_hud()))
+            if self.on_toggle_meeting_mode:
+                menu_items.append(item("🤫 Toggle Meeting Mode (Ctrl+Shift+M)", lambda: self.on_toggle_meeting_mode()))
 
             menu_items.extend([
                 Menu.SEPARATOR,

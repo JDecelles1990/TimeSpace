@@ -19,7 +19,7 @@ Persisted to `data/settings.json` via `Storage.load_config() -> AppConfig` and `
 | `volume` | `int` | `85` | Master hardware alarm volume percentage (`0`–`100`), scaled to `0`–`1000` for Windows MCI. |
 | `default_snooze_minutes` | `int` | `5` | Pre-selected snooze duration in `AlarmDialog` (`5`, `10`, `15`, or `30`). |
 | `gradual_escalation` | `bool` | `True` | Enables 15-second volume ramp-up (MCI) or tempo acceleration (`winsound`). |
-| `start_on_boot` | `bool` | `False` | Mirrors Windows `HKCU\...\Run` startup registration state. |
+| `start_on_boot` | `bool` | `True` | Mirrors Windows `HKCU\...\Run` startup registration state (enabled by default). |
 | `hud_enabled` | `bool` | `False` | Restores `FloatingMiniHUD` visibility automatically on launch. |
 | `hud_x` | `int` | `120` | Last saved screen X coordinate of `FloatingMiniHUD`. |
 | `hud_y` | `int` | `80` | Last saved screen Y coordinate of `FloatingMiniHUD`. |
@@ -30,6 +30,10 @@ Persisted to `data/settings.json` via `Storage.load_config() -> AppConfig` and `
 | `ahk_v2_exe_path` | `str` | `""` | Custom path to AutoHotkey v2 executable (`AutoHotkey64.exe` / `AutoHotkey.exe`); empty defaults to auto-detected installation under `C:\Program Files\AutoHotkey\v2\`. |
 | `ahk_script_path` | `str` | `""` | Custom path to generated `.ahk` script; empty defaults to `data/hotstrings.ahk`. |
 | `ahk_auto_start` | `bool` | `False` | Automatically launches the AutoHotkey v2 hotstrings script on TimeSpace startup. |
+| `meeting_mode_enabled` | `bool` | `False` | Manual Meeting Mode override state. |
+| `meeting_mode_auto_mic` | `bool` | `True` | Automatically engages Meeting Mode when Windows reports active microphone capture. |
+| `meeting_mode_mute_sound` | `bool` | `True` | Suppresses alarm chime/audio during Meeting Mode (keeps silent cards and toasts). |
+| `meeting_mode_until` | `float` | `0.0` | Unix epoch timestamp for timed mutes (`0.0` = indefinite / until toggled off). |
 
 ### 1.2 `ScheduledItem` (`src/scheduler.py`)
 Persisted as a JSON array in `data/reminders.json` via `Storage.load_reminders()` / `Storage.save_reminders()`. Protected in memory by `ReminderScheduler._lock`.
@@ -96,7 +100,8 @@ Persisted as a JSON array in `data/hotstrings.json` via `Storage.load_hotstrings
 ### 2.1 Identity & Shortcut Constants
 - `APP_TITLE = "TimeSpace"` — Window title, tray title, and Windows Action Center toast `app_id`.
 - `APP_REGISTRY_NAME = "TimeSpace"` — Registry value name under `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`.
-- `HOTKEY = "ctrl+f7"` — Global show/hide hotkey parsed by `GlobalHotkeyListener`.
+- `HOTKEY = "ctrl+f8"` — Global show/hide hotkey parsed by `GlobalHotkeyListener`.
+- `MEETING_HOTKEY = "ctrl+shift+m"` — Global Meeting Mode toggle hotkey parsed by `GlobalHotkeyListener`.
 - `FONT_FAMILY = "Segoe UI"` — Primary UI typeface (`Consolas` is used inside the Scratchpad editor).
 
 ### 2.2 `UI_DIMENSIONS` Pixel Specification

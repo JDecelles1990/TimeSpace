@@ -7,7 +7,8 @@ from typing import Dict, Any, Tuple, List
 # ---------------------------------------------------------------------------
 APP_TITLE = "TimeSpace"
 APP_REGISTRY_NAME = "TimeSpace"
-HOTKEY = "ctrl+f7"
+HOTKEY = "ctrl+f8"
+MEETING_HOTKEY = "ctrl+shift+m"
 FONT_FAMILY = "Segoe UI"
 
 # ---------------------------------------------------------------------------
@@ -368,7 +369,7 @@ class AppConfig:
     volume: int = 85
     default_snooze_minutes: int = 5
     gradual_escalation: bool = True
-    start_on_boot: bool = False
+    start_on_boot: bool = True
     hud_enabled: bool = False
     hud_x: int = 120
     hud_y: int = 80
@@ -379,6 +380,10 @@ class AppConfig:
     ahk_v2_exe_path: str = ""
     ahk_script_path: str = ""
     ahk_auto_start: bool = False
+    meeting_mode_enabled: bool = False
+    meeting_mode_auto_mic: bool = True
+    meeting_mode_mute_sound: bool = True
+    meeting_mode_until: float = 0.0
 
     def to_dict(self) -> Dict[str, Any]:
         return asdict(self)

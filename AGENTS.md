@@ -10,7 +10,7 @@
 
 **TimeSpace** is a dark-mode Windows 10/11 desktop module built with **Python 3.10+** and **PySide6**. It operates in two interchangeable modes:
 1. **Embedded F7Hub Module**: `TimerRendezVousWidget(QWidget)` (aliased as `TimeSpaceWidget`) plugs directly into the parent **F7Hub** modular monolith shell without creating competing windows, tray icons, or event loops.
-2. **Standalone Desktop Application**: `run.py` launches `MainApp(QMainWindow)`, wrapping `TimerRendezVousWidget` with Windows System Tray residency (`pystray`), native Win32 global hotkey toggling (`Ctrl+F7`), and auto-relaunch into `.venv`.
+2. **Standalone Desktop Application**: `run.py` launches `MainApp(QMainWindow)`, wrapping `TimerRendezVousWidget` with Windows System Tray residency (`pystray`), native Win32 global hotkey toggling (`Ctrl+F8`), and auto-relaunch into `.venv`.
 
 *(For integration code and execution flow, see [Docs/ARCHITECTURE.md](Docs/ARCHITECTURE.md#1-dual-mode-execution--f7hub-embedding).)*
 

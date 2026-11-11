@@ -7,10 +7,18 @@ from src.config import APP_REGISTRY_NAME
 
 def get_executable_command() -> str:
     """Return the exact command to run this application at Windows startup."""
-    python_exe = sys.executable
-    main_script = os.path.abspath(os.path.join(os.path.dirname(os.path.dirname(__file__)), "run.py"))
-    pythonw_exe = os.path.join(os.path.dirname(python_exe), "pythonw.exe")
-    exe = pythonw_exe if os.path.exists(pythonw_exe) else python_exe
+    project_dir = os.path.abspath(os.path.join(os.path.dirname(os.path.dirname(__file__))))
+    main_script = os.path.join(project_dir, "run.py")
+
+    # Prefer virtual environment pythonw.exe if available so PySide6 is guaranteed
+    venv_pythonw = os.path.join(project_dir, ".venv", "Scripts", "pythonw.exe")
+    if os.path.exists(venv_pythonw):
+        exe = venv_pythonw
+    else:
+        python_exe = sys.executable
+        pythonw_exe = os.path.join(os.path.dirname(python_exe), "pythonw.exe")
+        exe = pythonw_exe if os.path.exists(pythonw_exe) else python_exe
+
     return f'"{exe}" "{main_script}" --minimized'
 
 

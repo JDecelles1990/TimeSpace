@@ -5,6 +5,42 @@
 
 ---
 
+## [v3.12] — Discreet Meeting Mode & Native Windows Microphone Activity Detector (2026-11-11)
+- **Zero-Dependency Native Windows Microphone Activity Detector (`src/meeting_detector.py`)**:
+  - Added `is_microphone_in_use() -> bool` and `get_active_microphone_apps() -> List[str]` monitoring `HKCU\Software\Microsoft\Windows\CurrentVersion\CapabilityAccessManager\ConsentStore\microphone` (`NonPackaged` & `Packaged`).
+  - Automatically detects when conference apps (Teams, Zoom, Webex, Google Meet, Slack, Discord, browsers) have an active microphone capture session (`LastUsedTimeStop == 0`).
+  - Exception-safe fallback returning `False` without crashing on sandboxed or restricted Windows environments.
+- **Header Bar Button & Timed Mute Context Menu (`src/gui.py`)**:
+  - Added `self.btn_meeting_mode` (`🔔 Normal` / `🤫 Meeting` / `🤫 Call (Mic)` / `🤫 mm:ss`) in the top Header Bar with responsive styling and tooltips.
+  - Left-click toggles Meeting Mode ON/OFF immediately.
+  - Right-click context menu offers 1-click timed presets: `⚡ Mute for 30 Minutes`, `⚡ Mute for 1 Hour`, `⚡ Mute for 2 Hours`, `📅 Mute Until End of Day (17:00)`, and `♾️ Mute Indefinitely`.
+- **Global & In-Window Shortcut (`Ctrl+Shift+M`) & Tray Menu (`src/config.py`, `src/tray.py`, `src/gui.py`)**:
+  - Added `MEETING_HOTKEY = "ctrl+shift+m"` parsed by Win32 `GlobalHotkeyListener` (`MOD_NOREPEAT | MOD_CONTROL | MOD_SHIFT`, `VK = 'M'`).
+  - Added in-window `QShortcut("Ctrl+Shift+M")` and System Tray right-click item (`🤫 Toggle Meeting Mode`).
+- **Discreet Alarm Suppression & Visual Indicators (`src/alarm_dialog.py`, `src/gui.py`)**:
+  - Automatically suppresses audio chime playback (`SoundPlayer.start_alarm()`) whenever Meeting Mode is active.
+  - Displays bottom-right `AlarmDialog` cards with a discreet `🤫 MUTED` badge and dispatches quiet Action Center toasts (`[🤫 Meeting]`).
+- **Tab 7 Preferences (`7. Settings ⚙️`, `src/config.py`)**:
+  - Added `🤫 Discreet & Meeting Mode` settings group with checkboxes for `Auto-mute when microphone is in use` and `Mute alarm sound in Meeting Mode`.
+  - Added live status label reflecting microphone capture and manual mute states.
+
+---
+
+## [v3.11] — Windows Startup Auto-Launch & Global `Ctrl+F8` Hotkey Migration (2026-11-11)
+- **Global Show/Hide Shortcut Migration to `Ctrl+F8` (`src/config.py`, `src/gui.py`, `src/hotkey_manager.py`)**:
+  - Updated global hotkey constant `HOTKEY = "ctrl+f8"` in `src/config.py`.
+  - Updated Win32 `RegisterHotKey` / `WM_HOTKEY` keybinding to `VK_F8` (`0x77`, `MOD_CONTROL | MOD_NOREPEAT`) in `GlobalHotkeyListener`.
+  - Updated in-app `QShortcut("Ctrl+F8")` and `toggle_visibility()` handler in `MainApp` (`src/gui.py`).
+  - Updated top Header Bar hint to `Ctrl+F8 | Keys 1-7` in `TimerRendezVousWidget._build_header`.
+  - Synchronized documentation across `AGENTS.md`, `README.md`, `Docs/ARCHITECTURE.md`, `Docs/COMPONENT_MAP.md`, `Docs/STATE_AND_CONFIG.md`, and `Docs/USER_GUIDE.md`.
+- **Windows Startup Auto-Launch Enabled by Default (`src/config.py`, `src/startup.py`, `src/gui.py`)**:
+  - Changed default `AppConfig.start_on_boot` from `False` to `True` in `src/config.py`.
+  - Enhanced `get_executable_command()` in `src/startup.py` to automatically detect and prefer `.venv\Scripts\pythonw.exe` if present, ensuring the background windowless Python interpreter starts PySide6 cleanly with `--minimized`.
+  - Synchronized startup registry check on launch in `TimerRendezVousWidget.__init__` (`if self.app_config.start_on_boot and not is_startup_enabled(): set_startup_enabled(True)`).
+  - Maintained user toggle in `7. Settings ⚙️` (`Launch at Windows boot` checkbox) synced with HKCU `Run` registry key.
+
+---
+
 ## [v3.10] — AutoHotkey v2 Hotstrings Text Expanders Manager (2026-11-11)
 - **AutoHotkey v2 Hotstrings Manager Dialog (`src/ahk_dialog.py`, `src/ahk_manager.py`)**:
   - Added `AHKHotstringsDialog(QDialog)` pop-up window launched from `7. Settings ⚙️` via **`⚡ Set Up & Edit AHK v2 Hotstrings...`**.
@@ -21,10 +57,40 @@
 
 ---
 
+## [v3.11] — Windows Startup Auto-Launch & Global `Ctrl+F8` Hotkey Migration (2026-11-11)
+- **Global Show/Hide Shortcut Migration to `Ctrl+F8` (`src/config.py`, `src/gui.py`, `src/hotkey_manager.py`)**:
+  - Updated global hotkey constant `HOTKEY = "ctrl+f8"` in `src/config.py`.
+  - Updated Win32 `RegisterHotKey` / `WM_HOTKEY` keybinding to `VK_F8` (`0x77`, `MOD_CONTROL | MOD_NOREPEAT`) in `GlobalHotkeyListener`.
+  - Updated in-app `QShortcut("Ctrl+F8")` and `toggle_visibility()` handler in `MainApp` (`src/gui.py`).
+  - Updated top Header Bar hint to `Ctrl+F8 | Keys 1-7` in `TimerRendezVousWidget._build_header`.
+  - Synchronized documentation across `AGENTS.md`, `README.md`, `Docs/ARCHITECTURE.md`, `Docs/COMPONENT_MAP.md`, `Docs/STATE_AND_CONFIG.md`, and `Docs/USER_GUIDE.md`.
+- **Windows Startup Auto-Launch Enabled by Default (`src/config.py`, `src/startup.py`, `src/gui.py`)**:
+  - Changed default `AppConfig.start_on_boot` from `False` to `True` in `src/config.py`.
+  - Enhanced `get_executable_command()` in `src/startup.py` to automatically detect and prefer `.venv\Scripts\pythonw.exe` if present, ensuring the background windowless Python interpreter starts PySide6 cleanly with `--minimized`.
+  - Synchronized startup registry check on launch in `TimerRendezVousWidget.__init__` (`if self.app_config.start_on_boot and not is_startup_enabled(): set_startup_enabled(True)`).
+  - Maintained user toggle in `7. Settings ⚙️` (`Launch at Windows boot` checkbox) synced with HKCU `Run` registry key.
+
+---
+
 ## [v3.9] — Neon Gradient Button Glow & Countdown SpinBox Sizing (2026-11-09)
 - **Countdown Number Display Fix (`1. Timers ⏳`, `src/gui.py`)**: Enlarged `spin_h`, `spin_m`, and `spin_s` width bounds (`setMinimumWidth(75)`, `setMaximumWidth(110)`, up from the restrictive `maxWidth=62px` cap). This expands the internal `QLineEdit` from 13px to 48–54px (and 35–42px at minimum 480px window width), ensuring countdown numbers and suffixes (`0 h`, `15 m`, `0 s`) are fully visible and never clipped behind native spin stepper arrows.
 - **Violet ➔ Cyan Hover & Cyan ➔ Green Pressed Gradients (src/config.py, src/gui.py)**: Added glow_violet, glow_violet_light, glow_cyan, glow_green COLORS tokens and rewrote the QPushButton hover/pressed DARK_QSS rules (including #primaryBtn, #successBtn, #dangerBtn) with qlineargradient fills. Added ButtonGlowFilter(QObject) (src/gui.py) installed by TimerRendezVousWidget, applying a QGraphicsDropShadowEffect neon glow (violet on hover, cyan on press) to every QPushButton and removing it on leave.
 - **Gradient Tab Buttons (src/config.py)**: The 7 QTabBar::tab buttons now use a violet ➔ cyan gradient on hover and a cyan ➔ green gradient on the selected (clicked) tab. *(QTabBar tabs are not widgets, so they get the gradients but not the drop-shadow glow.)*
+
+---
+
+## [v3.11] — Windows Startup Auto-Launch & Global `Ctrl+F8` Hotkey Migration (2026-11-11)
+- **Global Show/Hide Shortcut Migration to `Ctrl+F8` (`src/config.py`, `src/gui.py`, `src/hotkey_manager.py`)**:
+  - Updated global hotkey constant `HOTKEY = "ctrl+f8"` in `src/config.py`.
+  - Updated Win32 `RegisterHotKey` / `WM_HOTKEY` keybinding to `VK_F8` (`0x77`, `MOD_CONTROL | MOD_NOREPEAT`) in `GlobalHotkeyListener`.
+  - Updated in-app `QShortcut("Ctrl+F8")` and `toggle_visibility()` handler in `MainApp` (`src/gui.py`).
+  - Updated top Header Bar hint to `Ctrl+F8 | Keys 1-7` in `TimerRendezVousWidget._build_header`.
+  - Synchronized documentation across `AGENTS.md`, `README.md`, `Docs/ARCHITECTURE.md`, `Docs/COMPONENT_MAP.md`, `Docs/STATE_AND_CONFIG.md`, and `Docs/USER_GUIDE.md`.
+- **Windows Startup Auto-Launch Enabled by Default (`src/config.py`, `src/startup.py`, `src/gui.py`)**:
+  - Changed default `AppConfig.start_on_boot` from `False` to `True` in `src/config.py`.
+  - Enhanced `get_executable_command()` in `src/startup.py` to automatically detect and prefer `.venv\Scripts\pythonw.exe` if present, ensuring the background windowless Python interpreter starts PySide6 cleanly with `--minimized`.
+  - Synchronized startup registry check on launch in `TimerRendezVousWidget.__init__` (`if self.app_config.start_on_boot and not is_startup_enabled(): set_startup_enabled(True)`).
+  - Maintained user toggle in `7. Settings ⚙️` (`Launch at Windows boot` checkbox) synced with HKCU `Run` registry key.
 
 ---
 
@@ -37,6 +103,21 @@
   - Added `AppConfig.custom_go_targets: List[Dict[str, str]]` persisted in `data/settings.json` with automatic sanitization in `AppConfig.from_dict()`.
   - Added **`⭐`** (`save_current_target_bookmark()`, supporting optional `Label | host` syntax) and **`✕`** (`remove_current_target_bookmark()`) next to `combo_presets` in `GoTroubleshootingTab`, displaying user bookmarks at the top of the presets dropdown (`⭐ Label (host)`).
   - Added the `bm [n|add|del]` (alias `bookmarks`) command to both the pure-Go Interactive CLI (`go_engine/main.go`) and the Python fallback REPL (`src/go_tab.py`) to list, select, add, and delete custom target bookmarks directly from the terminal.
+
+---
+
+## [v3.11] — Windows Startup Auto-Launch & Global `Ctrl+F8` Hotkey Migration (2026-11-11)
+- **Global Show/Hide Shortcut Migration to `Ctrl+F8` (`src/config.py`, `src/gui.py`, `src/hotkey_manager.py`)**:
+  - Updated global hotkey constant `HOTKEY = "ctrl+f8"` in `src/config.py`.
+  - Updated Win32 `RegisterHotKey` / `WM_HOTKEY` keybinding to `VK_F8` (`0x77`, `MOD_CONTROL | MOD_NOREPEAT`) in `GlobalHotkeyListener`.
+  - Updated in-app `QShortcut("Ctrl+F8")` and `toggle_visibility()` handler in `MainApp` (`src/gui.py`).
+  - Updated top Header Bar hint to `Ctrl+F8 | Keys 1-7` in `TimerRendezVousWidget._build_header`.
+  - Synchronized documentation across `AGENTS.md`, `README.md`, `Docs/ARCHITECTURE.md`, `Docs/COMPONENT_MAP.md`, `Docs/STATE_AND_CONFIG.md`, and `Docs/USER_GUIDE.md`.
+- **Windows Startup Auto-Launch Enabled by Default (`src/config.py`, `src/startup.py`, `src/gui.py`)**:
+  - Changed default `AppConfig.start_on_boot` from `False` to `True` in `src/config.py`.
+  - Enhanced `get_executable_command()` in `src/startup.py` to automatically detect and prefer `.venv\Scripts\pythonw.exe` if present, ensuring the background windowless Python interpreter starts PySide6 cleanly with `--minimized`.
+  - Synchronized startup registry check on launch in `TimerRendezVousWidget.__init__` (`if self.app_config.start_on_boot and not is_startup_enabled(): set_startup_enabled(True)`).
+  - Maintained user toggle in `7. Settings ⚙️` (`Launch at Windows boot` checkbox) synced with HKCU `Run` registry key.
 
 ---
 
@@ -62,6 +143,21 @@
 
 ---
 
+## [v3.11] — Windows Startup Auto-Launch & Global `Ctrl+F8` Hotkey Migration (2026-11-11)
+- **Global Show/Hide Shortcut Migration to `Ctrl+F8` (`src/config.py`, `src/gui.py`, `src/hotkey_manager.py`)**:
+  - Updated global hotkey constant `HOTKEY = "ctrl+f8"` in `src/config.py`.
+  - Updated Win32 `RegisterHotKey` / `WM_HOTKEY` keybinding to `VK_F8` (`0x77`, `MOD_CONTROL | MOD_NOREPEAT`) in `GlobalHotkeyListener`.
+  - Updated in-app `QShortcut("Ctrl+F8")` and `toggle_visibility()` handler in `MainApp` (`src/gui.py`).
+  - Updated top Header Bar hint to `Ctrl+F8 | Keys 1-7` in `TimerRendezVousWidget._build_header`.
+  - Synchronized documentation across `AGENTS.md`, `README.md`, `Docs/ARCHITECTURE.md`, `Docs/COMPONENT_MAP.md`, `Docs/STATE_AND_CONFIG.md`, and `Docs/USER_GUIDE.md`.
+- **Windows Startup Auto-Launch Enabled by Default (`src/config.py`, `src/startup.py`, `src/gui.py`)**:
+  - Changed default `AppConfig.start_on_boot` from `False` to `True` in `src/config.py`.
+  - Enhanced `get_executable_command()` in `src/startup.py` to automatically detect and prefer `.venv\Scripts\pythonw.exe` if present, ensuring the background windowless Python interpreter starts PySide6 cleanly with `--minimized`.
+  - Synchronized startup registry check on launch in `TimerRendezVousWidget.__init__` (`if self.app_config.start_on_boot and not is_startup_enabled(): set_startup_enabled(True)`).
+  - Maintained user toggle in `7. Settings ⚙️` (`Launch at Windows boot` checkbox) synced with HKCU `Run` registry key.
+
+---
+
 ## [v3.6] — `5. Go ⏱️` Enhancements: Color Console, Scratchpad Bridge, HTTP/DNS Probes, Presets & Binary Builder (2026-11-01)
 - **Color-Coded Live Output Console (`src/go_tab.py`)**:
   - Added `GoConsoleHighlighter(QSyntaxHighlighter)` highlighting `[PASS]`/`OPEN`/`✔`/`200 OK` in emerald green, `[FAIL]`/`[ERROR]`/`[STDERR]`/`UNREACHABLE`/`✖` in crimson red, `CLOSED/FILTERED`/`[WARN]`/`[STOPPED]`/`ELEVATED` in amber, and `═══` action headers in sky cyan using `COLORS` tokens.
@@ -83,6 +179,21 @@
 
 ---
 
+## [v3.11] — Windows Startup Auto-Launch & Global `Ctrl+F8` Hotkey Migration (2026-11-11)
+- **Global Show/Hide Shortcut Migration to `Ctrl+F8` (`src/config.py`, `src/gui.py`, `src/hotkey_manager.py`)**:
+  - Updated global hotkey constant `HOTKEY = "ctrl+f8"` in `src/config.py`.
+  - Updated Win32 `RegisterHotKey` / `WM_HOTKEY` keybinding to `VK_F8` (`0x77`, `MOD_CONTROL | MOD_NOREPEAT`) in `GlobalHotkeyListener`.
+  - Updated in-app `QShortcut("Ctrl+F8")` and `toggle_visibility()` handler in `MainApp` (`src/gui.py`).
+  - Updated top Header Bar hint to `Ctrl+F8 | Keys 1-7` in `TimerRendezVousWidget._build_header`.
+  - Synchronized documentation across `AGENTS.md`, `README.md`, `Docs/ARCHITECTURE.md`, `Docs/COMPONENT_MAP.md`, `Docs/STATE_AND_CONFIG.md`, and `Docs/USER_GUIDE.md`.
+- **Windows Startup Auto-Launch Enabled by Default (`src/config.py`, `src/startup.py`, `src/gui.py`)**:
+  - Changed default `AppConfig.start_on_boot` from `False` to `True` in `src/config.py`.
+  - Enhanced `get_executable_command()` in `src/startup.py` to automatically detect and prefer `.venv\Scripts\pythonw.exe` if present, ensuring the background windowless Python interpreter starts PySide6 cleanly with `--minimized`.
+  - Synchronized startup registry check on launch in `TimerRendezVousWidget.__init__` (`if self.app_config.start_on_boot and not is_startup_enabled(): set_startup_enabled(True)`).
+  - Maintained user toggle in `7. Settings ⚙️` (`Launch at Windows boot` checkbox) synced with HKCU `Run` registry key.
+
+---
+
 ## [v3.5] — `5. Go ⏱️` Cross-Platform Diagnostic & Troubleshooting Module (2026-11-01)
 - **Inserted `5. Go ⏱️` Tab Between `Scratchpad` and `History` (`src/go_tab.py`, `src/gui.py`, `src/config.py`, `src/__init__.py`)**:
   - Added `GoTroubleshootingTab(QWidget)` (`src/go_tab.py`) as Tab 5 (`5. Go ⏱️`), renumbering `History` to `6. History 📜` and `Settings` to `7. Settings ⚙️`, and tightened `QTabBar::tab` padding in `DARK_QSS` (`5px 7px`) so all 7 tabs fit on one row.
@@ -91,6 +202,21 @@
   - Included a built-in asynchronous `QProcess` fallback worker and interactive REPL (`--interactive`) in `src/go_tab.py` so all 6 diagnostic actions and external terminal sessions run out of the box even when `bin/diag_*` has not been compiled yet and `go` is not on `PATH`.
 - **Created Cross-Platform Go Engine (`go_engine/` & `bin/`)**:
   - Created `go_engine/go.mod`, `main.go` (supporting `--action`, `--target`, and `--interactive` REPL with `[ADMIN / ROOT]` vs `[STANDARD USER]` banner), `diag_common.go` (goroutine + `sync.WaitGroup` concurrent TCP port scan, `crypto/tls` certificate inspection, and TCP reachability probe), OS-specific build-tagged files (`fixes_windows.go`, `fixes_linux.go`, `fixes_darwin.go` implementing `isAdmin() bool` and `runOSAction()`), and `go_engine/build_all.ps1` (`CGO_ENABLED=0` cross-compiler for Windows, Linux, and macOS).
+
+---
+
+## [v3.11] — Windows Startup Auto-Launch & Global `Ctrl+F8` Hotkey Migration (2026-11-11)
+- **Global Show/Hide Shortcut Migration to `Ctrl+F8` (`src/config.py`, `src/gui.py`, `src/hotkey_manager.py`)**:
+  - Updated global hotkey constant `HOTKEY = "ctrl+f8"` in `src/config.py`.
+  - Updated Win32 `RegisterHotKey` / `WM_HOTKEY` keybinding to `VK_F8` (`0x77`, `MOD_CONTROL | MOD_NOREPEAT`) in `GlobalHotkeyListener`.
+  - Updated in-app `QShortcut("Ctrl+F8")` and `toggle_visibility()` handler in `MainApp` (`src/gui.py`).
+  - Updated top Header Bar hint to `Ctrl+F8 | Keys 1-7` in `TimerRendezVousWidget._build_header`.
+  - Synchronized documentation across `AGENTS.md`, `README.md`, `Docs/ARCHITECTURE.md`, `Docs/COMPONENT_MAP.md`, `Docs/STATE_AND_CONFIG.md`, and `Docs/USER_GUIDE.md`.
+- **Windows Startup Auto-Launch Enabled by Default (`src/config.py`, `src/startup.py`, `src/gui.py`)**:
+  - Changed default `AppConfig.start_on_boot` from `False` to `True` in `src/config.py`.
+  - Enhanced `get_executable_command()` in `src/startup.py` to automatically detect and prefer `.venv\Scripts\pythonw.exe` if present, ensuring the background windowless Python interpreter starts PySide6 cleanly with `--minimized`.
+  - Synchronized startup registry check on launch in `TimerRendezVousWidget.__init__` (`if self.app_config.start_on_boot and not is_startup_enabled(): set_startup_enabled(True)`).
+  - Maintained user toggle in `7. Settings ⚙️` (`Launch at Windows boot` checkbox) synced with HKCU `Run` registry key.
 
 ---
 
@@ -103,6 +229,21 @@
 - **Detectable & Clickable Web Links in Scratchpad (`src/gui.py`)**:
   - Added `ScratchpadUrlHighlighter(QSyntaxHighlighter)` to automatically detect and underline web links (`https://`, `http://`, `www.`, and bare domains) in real time using `COLORS["accent_link"]` (`#38bdf8`) while preserving user-applied bold and custom foreground colors.
   - Added pixel-accurate hover/click detection (`ScratchpadEditor._url_at_pos()`) that changes the cursor to a pointing hand (`👆`) with a target tooltip on hover and opens the link in the default browser via `open_attachment_link()` on a single left-click (without interfering with click-and-drag text selection).
+
+---
+
+## [v3.11] — Windows Startup Auto-Launch & Global `Ctrl+F8` Hotkey Migration (2026-11-11)
+- **Global Show/Hide Shortcut Migration to `Ctrl+F8` (`src/config.py`, `src/gui.py`, `src/hotkey_manager.py`)**:
+  - Updated global hotkey constant `HOTKEY = "ctrl+f8"` in `src/config.py`.
+  - Updated Win32 `RegisterHotKey` / `WM_HOTKEY` keybinding to `VK_F8` (`0x77`, `MOD_CONTROL | MOD_NOREPEAT`) in `GlobalHotkeyListener`.
+  - Updated in-app `QShortcut("Ctrl+F8")` and `toggle_visibility()` handler in `MainApp` (`src/gui.py`).
+  - Updated top Header Bar hint to `Ctrl+F8 | Keys 1-7` in `TimerRendezVousWidget._build_header`.
+  - Synchronized documentation across `AGENTS.md`, `README.md`, `Docs/ARCHITECTURE.md`, `Docs/COMPONENT_MAP.md`, `Docs/STATE_AND_CONFIG.md`, and `Docs/USER_GUIDE.md`.
+- **Windows Startup Auto-Launch Enabled by Default (`src/config.py`, `src/startup.py`, `src/gui.py`)**:
+  - Changed default `AppConfig.start_on_boot` from `False` to `True` in `src/config.py`.
+  - Enhanced `get_executable_command()` in `src/startup.py` to automatically detect and prefer `.venv\Scripts\pythonw.exe` if present, ensuring the background windowless Python interpreter starts PySide6 cleanly with `--minimized`.
+  - Synchronized startup registry check on launch in `TimerRendezVousWidget.__init__` (`if self.app_config.start_on_boot and not is_startup_enabled(): set_startup_enabled(True)`).
+  - Maintained user toggle in `7. Settings ⚙️` (`Launch at Windows boot` checkbox) synced with HKCU `Run` registry key.
 
 ---
 
@@ -122,11 +263,41 @@
 
 ---
 
+## [v3.11] — Windows Startup Auto-Launch & Global `Ctrl+F8` Hotkey Migration (2026-11-11)
+- **Global Show/Hide Shortcut Migration to `Ctrl+F8` (`src/config.py`, `src/gui.py`, `src/hotkey_manager.py`)**:
+  - Updated global hotkey constant `HOTKEY = "ctrl+f8"` in `src/config.py`.
+  - Updated Win32 `RegisterHotKey` / `WM_HOTKEY` keybinding to `VK_F8` (`0x77`, `MOD_CONTROL | MOD_NOREPEAT`) in `GlobalHotkeyListener`.
+  - Updated in-app `QShortcut("Ctrl+F8")` and `toggle_visibility()` handler in `MainApp` (`src/gui.py`).
+  - Updated top Header Bar hint to `Ctrl+F8 | Keys 1-7` in `TimerRendezVousWidget._build_header`.
+  - Synchronized documentation across `AGENTS.md`, `README.md`, `Docs/ARCHITECTURE.md`, `Docs/COMPONENT_MAP.md`, `Docs/STATE_AND_CONFIG.md`, and `Docs/USER_GUIDE.md`.
+- **Windows Startup Auto-Launch Enabled by Default (`src/config.py`, `src/startup.py`, `src/gui.py`)**:
+  - Changed default `AppConfig.start_on_boot` from `False` to `True` in `src/config.py`.
+  - Enhanced `get_executable_command()` in `src/startup.py` to automatically detect and prefer `.venv\Scripts\pythonw.exe` if present, ensuring the background windowless Python interpreter starts PySide6 cleanly with `--minimized`.
+  - Synchronized startup registry check on launch in `TimerRendezVousWidget.__init__` (`if self.app_config.start_on_boot and not is_startup_enabled(): set_startup_enabled(True)`).
+  - Maintained user toggle in `7. Settings ⚙️` (`Launch at Windows boot` checkbox) synced with HKCU `Run` registry key.
+
+---
+
 ## [v3.2] — Canonical Documentation Redesign & DRY Architecture (2026-10-31)
 - **Redesigned `AGENTS.md`**: Rebuilt the root `AGENTS.md` into a strict AI Coding Agent governance specification with mandatory pre-implementation reading order, PySide6/F7Hub boundary rules, thread-safety constraints, verification commands, and a single-owner documentation routing table.
 - **Added `Docs/STATE_AND_CONFIG.md` & `Docs/CHANGELOG.md`**: Extracted all `@dataclass` field contracts, `UI_DIMENSIONS`, `COLORS`, `DARK_QSS` selectors, and `data/*.json` schemas into `STATE_AND_CONFIG.md`, and consolidated project history into `CHANGELOG.md` to eliminate cross-document repetition.
 - **Synchronized `Docs/` & `README.md`**: Updated `ARCHITECTURE.md`, `COMPONENT_MAP.md`, `USER_GUIDE.md`, and `README.md` to reflect the 6-tab PySide6 UI, Win32 `RegisterHotKey` subsystem, and `.venv` auto-relaunch, removing legacy Tkinter and Pomodoro references.
 - **Package Facade (`src/__init__.py`)**: Added `GlobalHotkeyListener` to `__all__` exports.
+
+---
+
+## [v3.11] — Windows Startup Auto-Launch & Global `Ctrl+F8` Hotkey Migration (2026-11-11)
+- **Global Show/Hide Shortcut Migration to `Ctrl+F8` (`src/config.py`, `src/gui.py`, `src/hotkey_manager.py`)**:
+  - Updated global hotkey constant `HOTKEY = "ctrl+f8"` in `src/config.py`.
+  - Updated Win32 `RegisterHotKey` / `WM_HOTKEY` keybinding to `VK_F8` (`0x77`, `MOD_CONTROL | MOD_NOREPEAT`) in `GlobalHotkeyListener`.
+  - Updated in-app `QShortcut("Ctrl+F8")` and `toggle_visibility()` handler in `MainApp` (`src/gui.py`).
+  - Updated top Header Bar hint to `Ctrl+F8 | Keys 1-7` in `TimerRendezVousWidget._build_header`.
+  - Synchronized documentation across `AGENTS.md`, `README.md`, `Docs/ARCHITECTURE.md`, `Docs/COMPONENT_MAP.md`, `Docs/STATE_AND_CONFIG.md`, and `Docs/USER_GUIDE.md`.
+- **Windows Startup Auto-Launch Enabled by Default (`src/config.py`, `src/startup.py`, `src/gui.py`)**:
+  - Changed default `AppConfig.start_on_boot` from `False` to `True` in `src/config.py`.
+  - Enhanced `get_executable_command()` in `src/startup.py` to automatically detect and prefer `.venv\Scripts\pythonw.exe` if present, ensuring the background windowless Python interpreter starts PySide6 cleanly with `--minimized`.
+  - Synchronized startup registry check on launch in `TimerRendezVousWidget.__init__` (`if self.app_config.start_on_boot and not is_startup_enabled(): set_startup_enabled(True)`).
+  - Maintained user toggle in `7. Settings ⚙️` (`Launch at Windows boot` checkbox) synced with HKCU `Run` registry key.
 
 ---
 
@@ -146,6 +317,21 @@
 
 ---
 
+## [v3.11] — Windows Startup Auto-Launch & Global `Ctrl+F8` Hotkey Migration (2026-11-11)
+- **Global Show/Hide Shortcut Migration to `Ctrl+F8` (`src/config.py`, `src/gui.py`, `src/hotkey_manager.py`)**:
+  - Updated global hotkey constant `HOTKEY = "ctrl+f8"` in `src/config.py`.
+  - Updated Win32 `RegisterHotKey` / `WM_HOTKEY` keybinding to `VK_F8` (`0x77`, `MOD_CONTROL | MOD_NOREPEAT`) in `GlobalHotkeyListener`.
+  - Updated in-app `QShortcut("Ctrl+F8")` and `toggle_visibility()` handler in `MainApp` (`src/gui.py`).
+  - Updated top Header Bar hint to `Ctrl+F8 | Keys 1-7` in `TimerRendezVousWidget._build_header`.
+  - Synchronized documentation across `AGENTS.md`, `README.md`, `Docs/ARCHITECTURE.md`, `Docs/COMPONENT_MAP.md`, `Docs/STATE_AND_CONFIG.md`, and `Docs/USER_GUIDE.md`.
+- **Windows Startup Auto-Launch Enabled by Default (`src/config.py`, `src/startup.py`, `src/gui.py`)**:
+  - Changed default `AppConfig.start_on_boot` from `False` to `True` in `src/config.py`.
+  - Enhanced `get_executable_command()` in `src/startup.py` to automatically detect and prefer `.venv\Scripts\pythonw.exe` if present, ensuring the background windowless Python interpreter starts PySide6 cleanly with `--minimized`.
+  - Synchronized startup registry check on launch in `TimerRendezVousWidget.__init__` (`if self.app_config.start_on_boot and not is_startup_enabled(): set_startup_enabled(True)`).
+  - Maintained user toggle in `7. Settings ⚙️` (`Launch at Windows boot` checkbox) synced with HKCU `Run` registry key.
+
+---
+
 ## [v3.0] — Tkinter to PySide6 UI Migration for F7Hub (2026-10-31)
 - **Complete Framework Migration**: Replaced all `tkinter` / `ttk` views with **PySide6** widgets styled via centralized `DARK_QSS`.
 - **F7Hub Modular Split (`src/gui.py`)**:
@@ -156,6 +342,21 @@
 
 ---
 
+## [v3.11] — Windows Startup Auto-Launch & Global `Ctrl+F8` Hotkey Migration (2026-11-11)
+- **Global Show/Hide Shortcut Migration to `Ctrl+F8` (`src/config.py`, `src/gui.py`, `src/hotkey_manager.py`)**:
+  - Updated global hotkey constant `HOTKEY = "ctrl+f8"` in `src/config.py`.
+  - Updated Win32 `RegisterHotKey` / `WM_HOTKEY` keybinding to `VK_F8` (`0x77`, `MOD_CONTROL | MOD_NOREPEAT`) in `GlobalHotkeyListener`.
+  - Updated in-app `QShortcut("Ctrl+F8")` and `toggle_visibility()` handler in `MainApp` (`src/gui.py`).
+  - Updated top Header Bar hint to `Ctrl+F8 | Keys 1-7` in `TimerRendezVousWidget._build_header`.
+  - Synchronized documentation across `AGENTS.md`, `README.md`, `Docs/ARCHITECTURE.md`, `Docs/COMPONENT_MAP.md`, `Docs/STATE_AND_CONFIG.md`, and `Docs/USER_GUIDE.md`.
+- **Windows Startup Auto-Launch Enabled by Default (`src/config.py`, `src/startup.py`, `src/gui.py`)**:
+  - Changed default `AppConfig.start_on_boot` from `False` to `True` in `src/config.py`.
+  - Enhanced `get_executable_command()` in `src/startup.py` to automatically detect and prefer `.venv\Scripts\pythonw.exe` if present, ensuring the background windowless Python interpreter starts PySide6 cleanly with `--minimized`.
+  - Synchronized startup registry check on launch in `TimerRendezVousWidget.__init__` (`if self.app_config.start_on_boot and not is_startup_enabled(): set_startup_enabled(True)`).
+  - Maintained user toggle in `7. Settings ⚙️` (`Launch at Windows boot` checkbox) synced with HKCU `Run` registry key.
+
+---
+
 ## [v2.5] — Unified Dataclass State Refactor, Scratchpad & Bottom-Right Toasts (2026-10-31)
 - **Sweeping Cross-File State & Config Unification**:
   - Centralized all colors, pixel geometry (`UI_DIMENSIONS`), presets, and typed `@dataclass` state models (`AppConfig`, `HistoryEntry`, `ScratchpadState`, `ScheduledItem`) in `src/config.py` and `src/scheduler.py`.
@@ -163,6 +364,21 @@
 - **Added Time Notes Scratchpad (`Scratchpad 📝`)**: Persistent monospace scratchpad (`data/scratchpad.json`) with `Ctrl+T` timestamp insertion, 500ms debounced auto-save, `Copy All`, and `Clear`.
 - **Compact Bottom-Right `AlarmDialog`**: Replaced modal center-screen alarm windows and intrusive confirmation messageboxes with non-intrusive `350x132` frameless bottom-right notification cards that stack vertically and do not force-open the main window.
 - **Side-by-Side Hero Deck**: Combined the compact `CircularProgressRing` and Quick Natural Language Scheduler side-by-side at the top of the UI.
+
+---
+
+## [v3.11] — Windows Startup Auto-Launch & Global `Ctrl+F8` Hotkey Migration (2026-11-11)
+- **Global Show/Hide Shortcut Migration to `Ctrl+F8` (`src/config.py`, `src/gui.py`, `src/hotkey_manager.py`)**:
+  - Updated global hotkey constant `HOTKEY = "ctrl+f8"` in `src/config.py`.
+  - Updated Win32 `RegisterHotKey` / `WM_HOTKEY` keybinding to `VK_F8` (`0x77`, `MOD_CONTROL | MOD_NOREPEAT`) in `GlobalHotkeyListener`.
+  - Updated in-app `QShortcut("Ctrl+F8")` and `toggle_visibility()` handler in `MainApp` (`src/gui.py`).
+  - Updated top Header Bar hint to `Ctrl+F8 | Keys 1-7` in `TimerRendezVousWidget._build_header`.
+  - Synchronized documentation across `AGENTS.md`, `README.md`, `Docs/ARCHITECTURE.md`, `Docs/COMPONENT_MAP.md`, `Docs/STATE_AND_CONFIG.md`, and `Docs/USER_GUIDE.md`.
+- **Windows Startup Auto-Launch Enabled by Default (`src/config.py`, `src/startup.py`, `src/gui.py`)**:
+  - Changed default `AppConfig.start_on_boot` from `False` to `True` in `src/config.py`.
+  - Enhanced `get_executable_command()` in `src/startup.py` to automatically detect and prefer `.venv\Scripts\pythonw.exe` if present, ensuring the background windowless Python interpreter starts PySide6 cleanly with `--minimized`.
+  - Synchronized startup registry check on launch in `TimerRendezVousWidget.__init__` (`if self.app_config.start_on_boot and not is_startup_enabled(): set_startup_enabled(True)`).
+  - Maintained user toggle in `7. Settings ⚙️` (`Launch at Windows boot` checkbox) synced with HKCU `Run` registry key.
 
 ---
 

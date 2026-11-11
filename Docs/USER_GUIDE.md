@@ -8,7 +8,7 @@
 ## 1. Header & Hero Deck (Top Section)
 
 - **Neon Button Glow**: Every button glows with a violet ➔ cyan gradient while hovered and flashes a cyan ➔ green gradient while clicked. The 7 tab buttons use the same gradients (violet ➔ cyan on hover, cyan ➔ green for the active tab).
-- **Header Bar**: Displays the application title, keyboard shortcut hint (`Ctrl+F7 | Keys 1-7`), the **App Window Opacity Slider (`🔆 45%–100%`, default `90%`)** immediately on the left of the **`📌 HUD`** button, and the **`📌 HUD`** toggle button.
+- **Header Bar**: Displays the application title, keyboard shortcut hint (`Ctrl+F8 | Keys 1-7`), the **`🔔 Normal` / `🤫 Meeting` Mode button** (left-click to toggle, right-click for timed mutes, `Ctrl+Shift+M`), the **App Window Opacity Slider (`🔆 45%–100%`, default `90%`)** immediately on the left of the **`📌 HUD`** button, and the **`📌 HUD`** toggle button.
 - **Left — ⭕ Radial Circular Progress Ring** *(visible on Tabs 1, 2, 3, and 6; hidden on Tabs 4, 5, and 7 for maximum vertical workspace)*:
   - Smoothly depletes clockwise for your active timer (or nearest upcoming Rendez-vous when no timer is active).
   - **Urgency Colors**: Indigo (`>25%` remaining) ➔ Amber (`<25%`) ➔ Crimson Red (`<10%`), with inline `⏸ PAUSED` and `🔁 Repeat` status badges.
@@ -103,7 +103,11 @@
 - **Master Volume (`0–100%`)**: Hardware-scaled alarm loudness.
 - **App Transparency (`45–100%`, default `90%`)**: Controls overall TimeSpace main window opacity, synchronized live with the **`🔆` Opacity Slider** in the top header bar.
 - **Popup & HUD Opacity (`60–100%`, default `90%`)**: Controls transparency of the **Floating Mini HUD** and **Bottom-Right Alarm Popups**.
-- **System Options**: Toggle **Gradual volume escalation**, **Launch at Windows boot**, choose your **Default Snooze**, and click **`💾`**.
+- **System Options**: Toggle **Gradual volume escalation**, **Launch at Windows boot** (enabled by default), choose your **Default Snooze**, and click **`💾`**.
+- **🤫 Discreet & Meeting Mode Preferences**:
+  - **Auto-mute when microphone is in use**: Automatically silences alarm audio whenever Microsoft Teams, Zoom, Webex, Google Meet, or a browser call is actively capturing the microphone.
+  - **Mute alarm sound in Meeting Mode**: Bottom-right alarm popups and Windows toasts still appear visually with a discreet `🤫 MUTED` badge, but audio chimes are suppressed.
+  - **Live Status & Quick Toggle**: Displays active call / microphone status with 1-click **`Toggle Meeting Mode`** and keyboard shortcut **`Ctrl+Shift+M`**.
 - **⌨️ AutoHotkey v2 Text Expanders (Hotstrings)**:
   - Click **`⚡ Set Up & Edit AHK v2 Hotstrings...`** to open the dedicated pop-up manager.
   - **Quick Controls**: **`▶️ Run`** / **`⏹️ Stop`** active hotstrings directly from Settings, and check **`☑️ Auto-run hotstrings script on TimeSpace launch`**.
@@ -124,7 +128,8 @@
 
 | Shortcut / Action | Behavior |
 |---|---|
-| **`Ctrl + F7`** *(Global)* | Minimize main window if visible, or restore & focus when minimized/hidden |
+| **`Ctrl + F8`** *(Global)* | Minimize main window if visible, or restore & focus when minimized/hidden |
+| **`Ctrl + Shift + M`** *(Global)* | Toggle Meeting Mode ON/OFF (discreet silent alarms for calls & meetings) |
 | **`1` – `7`** *(or **`Alt+1` – `Alt+7`**)* | Jump directly to section tabs `1. Timers` through `7. Settings` (`Escape` clears input focus) |
 | **`Delete`** *(in `6. History 📜`)* | Delete selected individual entry/entries from the History list |
 | **`Double-Click` / `✏️`** *(Queue / Activity)* | Load active Timer or RDV into Tab 1 / Tab 2 for inline editing (`💾`) |

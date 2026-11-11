@@ -20,7 +20,7 @@ The UI layer in `src/gui.py` is split into two distinct classes to support both 
 
 2. **Standalone Application Shell (`MainApp(QMainWindow)` & `run.py`)**:
    - Wraps `TimerRendezVousWidget` as its central widget (`650x800`, min `600x720`).
-   - Adds `TrayManager` (`pystray`), `GlobalHotkeyListener` (`Ctrl+F7`), 1-second tray tooltip synchronization, `--minimized` startup flag support, and `closeEvent` interception (hides to tray instead of terminating).
+   - Adds `TrayManager` (`pystray`), `GlobalHotkeyListener` (`Ctrl+F8` window toggle, `Ctrl+Shift+M` meeting mode), 1-second tray tooltip synchronization, `--minimized` startup flag support, and `closeEvent` interception (hides to tray instead of terminating).
    - **Virtualenv Auto-Relaunch (`run.py`)**: `_ensure_pyside6_interpreter()` checks `import PySide6` at startup; if launched from a global Python interpreter missing `PySide6`, it transparently re-executes the script with `.venv\Scripts\python.exe` while forwarding CLI arguments.
 
 ---
@@ -61,9 +61,9 @@ PySide6 forbids touching `QWidget` instances from non-GUI threads. All backgroun
 ## 3. Native Windows Subsystems
 
 ### 3.1 OS-Wide Global Hotkey (`src/hotkey_manager.py`)
-- Uses `ctypes.windll.user32.RegisterHotKey` with `MOD_CONTROL | MOD_NOREPEAT` (`0x4002`) and `VK_F7` (`0x76`) inside a dedicated Win32 `GetMessageW` thread.
+- Uses `ctypes.windll.user32.RegisterHotKey` with `MOD_CONTROL | MOD_NOREPEAT` (`0x4002`) and `VK_F8` (`0x77`) inside a dedicated Win32 `GetMessageW` thread.
 - **Why Win32 API first**: Unlike low-level keyboard hooks (`keyboard` package), `RegisterHotKey` works reliably across all Windows applications **without Administrator privileges** and incurs zero per-keystroke hook overhead.
-- **Graceful Fallbacks**: If another process already holds the hotkey, it falls back to `keyboard.add_hotkey`, while `MainApp` also binds an in-window `QShortcut("Ctrl+F7")`. Clean shutdown posts `WM_QUIT` (`PostThreadMessageW`) and calls `UnregisterHotKey`.
+- **Graceful Fallbacks**: If another process already holds the hotkey, it falls back to `keyboard.add_hotkey`, while `MainApp` also binds an in-window `QShortcut("Ctrl+F8")`. Clean shutdown posts `WM_QUIT` (`PostThreadMessageW`) and calls `UnregisterHotKey`.
 
 ### 3.2 Bottom-Right Notification Cards (`src/alarm_dialog.py`), OS Link Dispatch & Action Center (`src/notifications.py`)
 - When an item fires, `_popup_alarm` does **not** force-open or focus-steal `MainApp`.
@@ -85,3 +85,8 @@ PySide6 forbids touching `QWidget` instances from non-GUI threads. All backgroun
 
 ### 3.5 Windows Boot Auto-Start (`src/startup.py`)
 - Writes or removes `"<pythonw.exe>" "<run.py>" --minimized` under `HKCU\Software\Microsoft\Windows\CurrentVersion\Run` (`TimeSpace`), preferring `pythonw.exe` inside `.venv\Scripts` so boot startup never flashes a console window.
+
+### 3.6 Discreet Meeting Mode & Native Windows Microphone Activity Detector (`src/meeting_detector.py`)
+- **Zero-Dependency Win32 Registry Inspection**: Queries `HKCU\Software\Microsoft\Windows\CurrentVersion\CapabilityAccessManager\ConsentStore\microphone` (`NonPackaged` and `Packaged` subkeys). When Windows or any conference tool (Teams, Zoom, Webex, Google Meet, Slack, Discord, Chrome/Edge) actively captures audio from the microphone, Windows sets `LastUsedTimeStop == 0` and `LastUsedTimeStart > 0`.
+- **Hybrid Manual & Timed Overrides**: Supports immediate 1-click Header Bar toggling, global `Ctrl+Shift+M` hotkey, Tray context menu, and right-click timed mutes (`30m`, `1h`, `2h`, `17:00 End of Day`).
+- **Discreet Alarm Suppression**: When Meeting Mode is active, audio chime playback (`SoundPlayer.start_alarm`) is completely silenced, while the bottom-right `AlarmDialog` appears with a discreet `🤫 MUTED` badge and the Action Center toast is dispatched silently.

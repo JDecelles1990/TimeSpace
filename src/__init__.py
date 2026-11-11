@@ -20,10 +20,12 @@ from src.config import (
     ScratchpadState,
     AHKHotstringItem,
     DEFAULT_AHK_HOTSTRINGS,
+    MEETING_HOTKEY,
 )
 from src.storage import Storage
 from src.scheduler import ReminderScheduler, ScheduledItem
 from src.hotkey_manager import GlobalHotkeyListener
+from src.meeting_detector import is_microphone_in_use, get_active_microphone_apps
 from src.go_tab import GoTroubleshootingTab
 from src.ahk_manager import AHKProcessManager, find_ahk_v2_exe, generate_ahk_v2_script
 from src.ahk_dialog import AHKHotstringsDialog, AHKItemEditDialog
@@ -55,6 +57,9 @@ __all__ = [
     "GoTroubleshootingTab",
     "AHKHotstringItem",
     "DEFAULT_AHK_HOTSTRINGS",
+    "MEETING_HOTKEY",
+    "is_microphone_in_use",
+    "get_active_microphone_apps",
     "AHKProcessManager",
     "find_ahk_v2_exe",
     "generate_ahk_v2_script",

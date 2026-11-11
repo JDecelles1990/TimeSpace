@@ -11,7 +11,7 @@ A sleek, dark-mode **PySide6** desktop application and pluggable **F7Hub** modul
 
 ## ✨ Highlights
 
-- **Dual-Mode Architecture**: Runs standalone (`MainApp`) with System Tray & Win32 `Ctrl+F7` global hotkey, or embeds directly into the **F7Hub** modular monolith via `TimerRendezVousWidget(QWidget)`.
+- **Dual-Mode Architecture**: Runs standalone (`MainApp`) with System Tray & Win32 `Ctrl+F8` global hotkey, or embeds directly into the **F7Hub** modular monolith via `TimerRendezVousWidget(QWidget)`.
 - **Hero Deck**: Anti-aliased `QPainter` Radial Countdown Ring (`124px`) paired with a plain-English Natural Language Scheduler (`"Ring in 15m"`, `"Call Sam in 2 days at 3pm"`, `"RDV tomorrow at 14:00"`).
 - **6 Focused Modules + Persistent Multi-Row Queue**:
   1. **`1. Timers ⏳`** — Everyday presets (`15m`, `30m`, `1h`, `2h`) and custom task reminders with optional `Client / Ticket #` tagging and `Link / Note` attachments.

@@ -54,6 +54,7 @@ from PySide6.QtWidgets import (
 from src.config import (
     APP_TITLE,
     HOTKEY,
+    MEETING_HOTKEY,
     COLORS,
     UI_DIMENSIONS,
     DARK_QSS,
@@ -84,6 +85,7 @@ from src.go_tab import GoTroubleshootingTab
 from src.ahk_manager import AHKProcessManager, find_ahk_v2_exe, generate_ahk_v2_script
 from src.ahk_dialog import AHKHotstringsDialog
 from src.storage import DEFAULT_AHK_SCRIPT_FILE
+from src.meeting_detector import is_microphone_in_use, get_active_microphone_apps
 
 
 _URL_TOKEN_RE = re.compile(r"(?:https?://|www\.)[^\s<>\"']+", re.IGNORECASE)
@@ -589,6 +591,7 @@ class SchedulerBridge(QObject):
     quitRequested = Signal()
     togglePauseRequested = Signal()
     toggleHudRequested = Signal()
+    toggleMeetingModeRequested = Signal()
 
 
 class TimerRendezVousWidget(QWidget):
@@ -624,6 +627,10 @@ class TimerRendezVousWidget(QWidget):
         self.bridge.wakeMissedTriggered.connect(self._handle_wake_missed_ui)
         self.bridge.togglePauseRequested.connect(self._toggle_active_timer_pause)
         self.bridge.toggleHudRequested.connect(self._toggle_hud)
+        self.bridge.toggleMeetingModeRequested.connect(self._toggle_meeting_mode)
+
+        # Meeting Mode & Microphone State
+        self._mic_active: bool = False
 
         # Initialize Background Scheduler
         self.scheduler = ReminderScheduler(
@@ -667,12 +674,15 @@ class TimerRendezVousWidget(QWidget):
             QTimer.singleShot(800, self._show_hud)
         if self.app_config.ahk_auto_start:
             QTimer.singleShot(1200, self._auto_start_ahk_script)
+        if self.app_config.start_on_boot and not is_startup_enabled():
+            set_startup_enabled(True)
 
     # ── Background Thread Callbacks (Emit via Bridge) ────────────────────────
 
     def _on_trigger_background(self, item: ScheduledItem) -> None:
+        meeting_tag = " [🤫 Meeting]" if self.is_meeting_mode_active() else ""
         show_toast(
-            f"⏰ {item.name}",
+            f"⏰ {item.name}{meeting_tag}",
             f"Your {item.kind} ({item.category}) has triggered!",
             url=item.url,
             note=item.note,
@@ -708,11 +718,20 @@ class TimerRendezVousWidget(QWidget):
         title_lbl.setStyleSheet(f"font-size: 16px; font-weight: bold; color: {COLORS['text']};")
         hdr.addWidget(title_lbl)
 
-        sub_lbl = QLabel("Ctrl+F7 | Keys 1-7")
+        sub_lbl = QLabel("Ctrl+F8 | Keys 1-7")
         sub_lbl.setStyleSheet(f"font-size: 10px; color: {COLORS['text_muted']};")
         hdr.addWidget(sub_lbl)
 
         hdr.addStretch()
+
+        # Meeting Mode Button (Left-click toggle, Right-click timed presets)
+        self.btn_meeting_mode = QPushButton("🔔 Normal")
+        self.btn_meeting_mode.setFixedHeight(23)
+        self.btn_meeting_mode.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_meeting_mode.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.btn_meeting_mode.customContextMenuRequested.connect(self._show_meeting_mode_menu)
+        self.btn_meeting_mode.clicked.connect(self._toggle_meeting_mode)
+        hdr.addWidget(self.btn_meeting_mode)
 
         # App Opacity Slider on the left side of the HUD button (min=45, max=100, default=90)
         self.lbl_header_opacity = QLabel(f"🔆 {self.app_config.app_opacity}%")
@@ -1578,7 +1597,7 @@ class TimerRendezVousWidget(QWidget):
         row_opts.addWidget(self.chk_escalate)
 
         self.chk_startup = QCheckBox("Launch at Windows boot")
-        self.chk_startup.setChecked(is_startup_enabled())
+        self.chk_startup.setChecked(is_startup_enabled() or self.app_config.start_on_boot)
         row_opts.addWidget(self.chk_startup)
         row_opts.addStretch()
         s_layout.addLayout(row_opts)
@@ -1610,7 +1629,49 @@ class TimerRendezVousWidget(QWidget):
 
         layout.addWidget(s_group)
 
-        # ── Group 2: AutoHotkey v2 Text Expanders (Hotstrings) ──
+        # ── Group 2: Discreet & Meeting Mode ──
+        meeting_group = QGroupBox("🤫 Discreet & Meeting Mode")
+        meeting_layout = QVBoxLayout(meeting_group)
+        meeting_layout.setContentsMargins(8, 6, 8, 6)
+        meeting_layout.setSpacing(6)
+
+        meeting_row1 = QHBoxLayout()
+        self.chk_meeting_auto_mic = QCheckBox("Auto-mute when microphone is in use (Teams, Zoom, Meet, etc.)")
+        self.chk_meeting_auto_mic.setChecked(self.app_config.meeting_mode_auto_mic)
+        self.chk_meeting_auto_mic.setToolTip("Automatically suppress alarm chimes when any conference app captures microphone audio")
+        meeting_row1.addWidget(self.chk_meeting_auto_mic)
+        meeting_row1.addStretch()
+        meeting_layout.addLayout(meeting_row1)
+
+        meeting_row2 = QHBoxLayout()
+        self.chk_meeting_mute_sound = QCheckBox("Mute alarm sound in Meeting Mode (keep silent popups & toasts)")
+        self.chk_meeting_mute_sound.setChecked(self.app_config.meeting_mode_mute_sound)
+        self.chk_meeting_mute_sound.setToolTip("When checked, bottom-right popups and toasts appear silently without audio chime")
+        meeting_row2.addWidget(self.chk_meeting_mute_sound)
+        meeting_row2.addStretch()
+        meeting_layout.addLayout(meeting_row2)
+
+        meeting_status_row = QHBoxLayout()
+        meeting_status_row.setSpacing(8)
+        self.lbl_meeting_settings_status = QLabel("⚪ Idle • Audio Chimes Enabled")
+        self.lbl_meeting_settings_status.setStyleSheet(f"color: {COLORS['text_muted']}; font-size: 11px;")
+        meeting_status_row.addWidget(self.lbl_meeting_settings_status)
+        meeting_status_row.addStretch()
+
+        shortcut_hint = QLabel("Shortcut: Ctrl+Shift+M")
+        shortcut_hint.setStyleSheet(f"color: {COLORS['text_muted']}; font-size: 10px;")
+        meeting_status_row.addWidget(shortcut_hint)
+
+        btn_meeting_toggle_settings = QPushButton("Toggle Meeting Mode")
+        btn_meeting_toggle_settings.setFixedHeight(24)
+        btn_meeting_toggle_settings.setCursor(Qt.CursorShape.PointingHandCursor)
+        btn_meeting_toggle_settings.clicked.connect(self._toggle_meeting_mode)
+        meeting_status_row.addWidget(btn_meeting_toggle_settings)
+        meeting_layout.addLayout(meeting_status_row)
+
+        layout.addWidget(meeting_group)
+
+        # ── Group 3: AutoHotkey v2 Text Expanders (Hotstrings) ──
         ahk_group = QGroupBox("⌨️ AutoHotkey v2 Text Expanders (Hotstrings)")
         ahk_layout = QVBoxLayout(ahk_group)
         ahk_layout.setContentsMargins(6, 6, 6, 6)
@@ -2478,6 +2539,10 @@ class TimerRendezVousWidget(QWidget):
         self.app_config.default_snooze_minutes = int(self.combo_snooze.currentData() or 5)
         self.app_config.gradual_escalation = self.chk_escalate.isChecked()
         self.app_config.start_on_boot = self.chk_startup.isChecked()
+        if hasattr(self, "chk_meeting_auto_mic"):
+            self.app_config.meeting_mode_auto_mic = self.chk_meeting_auto_mic.isChecked()
+        if hasattr(self, "chk_meeting_mute_sound"):
+            self.app_config.meeting_mode_mute_sound = self.chk_meeting_mute_sound.isChecked()
         if hasattr(self, "chk_ahk_auto_start"):
             self.app_config.ahk_auto_start = self.chk_ahk_auto_start.isChecked()
 
@@ -2589,6 +2654,167 @@ class TimerRendezVousWidget(QWidget):
             self.app_config.hud_enabled = self.hud_enabled
             Storage.save_config(self.app_config)
 
+    # ── Discreet & Meeting Mode Controller ───────────────────────────────────
+
+    def is_meeting_mode_active(self) -> bool:
+        """Return True if meeting mode / audio mute is currently active."""
+        now = time.time()
+        # 1. Manual meeting mode override
+        if self.app_config.meeting_mode_enabled:
+            if self.app_config.meeting_mode_until > 0.0:
+                if now < self.app_config.meeting_mode_until:
+                    return True
+                else:
+                    # Timed mute expired
+                    self.app_config.meeting_mode_enabled = False
+                    self.app_config.meeting_mode_until = 0.0
+                    Storage.save_config(self.app_config)
+            else:
+                return True
+
+        # 2. Automatic microphone capture detection
+        if self.app_config.meeting_mode_auto_mic and getattr(self, "_mic_active", False):
+            return True
+
+        return False
+
+    def _toggle_meeting_mode(self) -> None:
+        """Toggle manual meeting mode ON or OFF."""
+        if self.is_meeting_mode_active():
+            # Turn OFF (clear manual mute and timed mute)
+            self.app_config.meeting_mode_enabled = False
+            self.app_config.meeting_mode_until = 0.0
+        else:
+            # Turn ON (manual indefinite mute)
+            self.app_config.meeting_mode_enabled = True
+            self.app_config.meeting_mode_until = 0.0
+
+        Storage.save_config(self.app_config)
+        self._update_meeting_mode_ui()
+
+    def _show_meeting_mode_menu(self, pos: QPoint) -> None:
+        """Context menu offering quick timed mute presets."""
+        menu = QMenu(self)
+        menu.setStyleSheet(
+            f"QMenu {{ background-color: {COLORS['surface']}; color: {COLORS['text']}; "
+            f"border: 1px solid {COLORS['border']}; border-radius: 4px; padding: 4px; }}"
+            f"QMenu::item {{ padding: 5px 20px 5px 10px; border-radius: 3px; }}"
+            f"QMenu::item:selected {{ background-color: {COLORS['accent']}; color: #ffffff; }}"
+        )
+
+        def set_mute_duration(minutes: int):
+            self.app_config.meeting_mode_enabled = True
+            self.app_config.meeting_mode_until = time.time() + (minutes * 60)
+            Storage.save_config(self.app_config)
+            self._update_meeting_mode_ui()
+
+        def set_mute_until_end_of_day():
+            now = datetime.datetime.now()
+            end_hour = 17 if now.hour < 17 else (18 if now.hour < 18 else 23)
+            target = now.replace(hour=end_hour, minute=0, second=0, microsecond=0)
+            if target <= now:
+                target += datetime.timedelta(days=1)
+            self.app_config.meeting_mode_enabled = True
+            self.app_config.meeting_mode_until = target.timestamp()
+            Storage.save_config(self.app_config)
+            self._update_meeting_mode_ui()
+
+        def set_mute_indefinite():
+            self.app_config.meeting_mode_enabled = True
+            self.app_config.meeting_mode_until = 0.0
+            Storage.save_config(self.app_config)
+            self._update_meeting_mode_ui()
+
+        def turn_off():
+            self.app_config.meeting_mode_enabled = False
+            self.app_config.meeting_mode_until = 0.0
+            Storage.save_config(self.app_config)
+            self._update_meeting_mode_ui()
+
+        a_30m = menu.addAction("⚡ Mute for 30 Minutes")
+        a_30m.triggered.connect(lambda: set_mute_duration(30))
+
+        a_1h = menu.addAction("⚡ Mute for 1 Hour")
+        a_1h.triggered.connect(lambda: set_mute_duration(60))
+
+        a_2h = menu.addAction("⚡ Mute for 2 Hours")
+        a_2h.triggered.connect(lambda: set_mute_duration(120))
+
+        a_eod = menu.addAction("📅 Mute Until End of Day (17:00)")
+        a_eod.triggered.connect(set_mute_until_end_of_day)
+
+        a_indef = menu.addAction("♾️ Mute Indefinitely")
+        a_indef.triggered.connect(set_mute_indefinite)
+
+        menu.addSeparator()
+
+        a_off = menu.addAction("🔔 Turn Off Meeting Mode (Audio ON)")
+        a_off.triggered.connect(turn_off)
+
+        menu.exec(self.btn_meeting_mode.mapToGlobal(pos))
+
+    def _update_meeting_mode_ui(self) -> None:
+        """Update Header button and Settings status label reflecting current meeting mode state."""
+        if not hasattr(self, "btn_meeting_mode"):
+            return
+        active = self.is_meeting_mode_active()
+        now = time.time()
+
+        if active:
+            if self.app_config.meeting_mode_enabled and self.app_config.meeting_mode_until > 0:
+                rem_sec = max(0, int(self.app_config.meeting_mode_until - now))
+                m = rem_sec // 60
+                s = rem_sec % 60
+                self.btn_meeting_mode.setText(f"🤫 {m:02d}:{s:02d}")
+                self.btn_meeting_mode.setToolTip(
+                    f"Meeting Mode Active (Muted for {m}m {s}s)\nLeft-click to turn OFF | Right-click for presets | Ctrl+Shift+M"
+                )
+            elif self.app_config.meeting_mode_enabled:
+                self.btn_meeting_mode.setText("🤫 Meeting")
+                self.btn_meeting_mode.setToolTip(
+                    "Meeting Mode Active (Manual Mute)\nLeft-click to turn OFF | Right-click for presets | Ctrl+Shift+M"
+                )
+            elif getattr(self, "_mic_active", False):
+                self.btn_meeting_mode.setText("🤫 Call (Mic)")
+                self.btn_meeting_mode.setToolTip(
+                    "Meeting Mode Active (Microphone in use)\nLeft-click to override | Right-click for presets | Ctrl+Shift+M"
+                )
+            else:
+                self.btn_meeting_mode.setText("🤫 Meeting")
+                self.btn_meeting_mode.setToolTip("Meeting Mode Active (Audio Muted)")
+
+            self.btn_meeting_mode.setStyleSheet(
+                f"QPushButton {{ background-color: {COLORS['surface_light']}; color: {COLORS['glow_cyan']}; "
+                f"border: 1px solid {COLORS['glow_cyan']}; border-radius: 4px; font-weight: bold; padding: 2px 8px; }}"
+            )
+        else:
+            self.btn_meeting_mode.setText("🔔 Normal")
+            self.btn_meeting_mode.setStyleSheet(
+                f"QPushButton {{ background-color: {COLORS['surface']}; color: {COLORS['text_muted']}; "
+                f"border: 1px solid {COLORS['border']}; border-radius: 4px; padding: 2px 8px; }}"
+            )
+            self.btn_meeting_mode.setToolTip(
+                "Meeting Mode: Idle (Audio enabled)\nLeft-click to mute | Right-click for timed presets | Ctrl+Shift+M"
+            )
+
+        if hasattr(self, "lbl_meeting_settings_status"):
+            if active:
+                if getattr(self, "_mic_active", False):
+                    apps = get_active_microphone_apps()
+                    app_str = f" ({', '.join(apps)})" if apps else ""
+                    self.lbl_meeting_settings_status.setText(f"🟢 Active • Microphone in use{app_str} • Audio Muted")
+                    self.lbl_meeting_settings_status.setStyleSheet(
+                        f"color: {COLORS['accent_success']}; font-weight: bold; font-size: 11px;"
+                    )
+                else:
+                    self.lbl_meeting_settings_status.setText("🤫 Active • Manual Meeting Mode • Audio Muted")
+                    self.lbl_meeting_settings_status.setStyleSheet(
+                        f"color: {COLORS['glow_cyan']}; font-weight: bold; font-size: 11px;"
+                    )
+            else:
+                self.lbl_meeting_settings_status.setText("⚪ Idle • Audio Chimes Enabled")
+                self.lbl_meeting_settings_status.setStyleSheet(f"color: {COLORS['text_muted']}; font-size: 11px;")
+
     # ── 1-Second QTimer Live Refresh Loop ────────────────────────────────────
 
     def _refresh_loop(self) -> None:
@@ -2682,6 +2908,13 @@ class TimerRendezVousWidget(QWidget):
 
         self._refresh_activity_tab(now)
 
+        # Check Meeting Mode & microphone capture state
+        if self.app_config.meeting_mode_auto_mic:
+            self._mic_active = is_microphone_in_use()
+        else:
+            self._mic_active = False
+        self._update_meeting_mode_ui()
+
     def _refresh_activity_tab(self, now: float) -> None:
         timers = [it for it in self.scheduler.items if it.kind == "timer"]
         rdvs = [it for it in self.scheduler.items if it.kind == "rendez-vous"]
@@ -2729,6 +2962,7 @@ class TimerRendezVousWidget(QWidget):
             names = ", ".join(f"'{it.name}'" for it in self.scheduler.missed_items[:3])
             more = f" +{len(self.scheduler.missed_items) - 3} more" if len(self.scheduler.missed_items) > 3 else ""
             single = self.scheduler.missed_items[0] if len(self.scheduler.missed_items) == 1 else None
+            meeting_active = self.is_meeting_mode_active()
             AlarmDialog(
                 master=self,
                 title_text="Missed While Closed",
@@ -2737,12 +2971,14 @@ class TimerRendezVousWidget(QWidget):
                 url=single.url if single else "",
                 note=single.note if single else "",
                 config=self.app_config,
+                meeting_mode=meeting_active,
             )
             self.scheduler.missed_items.clear()
 
     def _handle_wake_missed_ui(self, items: List[ScheduledItem]) -> None:
         names = ", ".join(f"'{it.name}'" for it in items[:3])
         single = items[0] if len(items) == 1 else None
+        meeting_active = self.is_meeting_mode_active()
         AlarmDialog(
             master=self,
             title_text="Missed During PC Sleep",
@@ -2751,10 +2987,14 @@ class TimerRendezVousWidget(QWidget):
             url=single.url if single else "",
             note=single.note if single else "",
             config=self.app_config,
+            meeting_mode=meeting_active,
         )
 
     def _popup_alarm(self, item: ScheduledItem) -> None:
-        self.sound_player.start_alarm(config=self.app_config)
+        meeting_active = self.is_meeting_mode_active()
+        mute_sound = meeting_active and self.app_config.meeting_mode_mute_sound
+        if not mute_sound:
+            self.sound_player.start_alarm(config=self.app_config)
 
         now_str = datetime.datetime.now().strftime("%b %d, %H:%M:%S")
         Storage.add_history_entry(
@@ -2836,6 +3076,7 @@ class TimerRendezVousWidget(QWidget):
             url=item.url,
             note=item.note,
             config=self.app_config,
+            meeting_mode=meeting_active,
         )
 
 
@@ -2868,6 +3109,7 @@ class MainApp(QMainWindow):
             on_exit=lambda: self.module_widget.bridge.quitRequested.emit(),
             on_toggle_pause=lambda: self.module_widget.bridge.togglePauseRequested.emit(),
             on_toggle_hud=lambda: self.module_widget.bridge.toggleHudRequested.emit(),
+            on_toggle_meeting_mode=lambda: self.module_widget.bridge.toggleMeetingModeRequested.emit(),
         )
         self.tray.start()
 
@@ -2888,13 +3130,14 @@ class MainApp(QMainWindow):
 
     def _update_tray_tooltip(self) -> None:
         nearest = self.module_widget.scheduler.get_nearest_item()
+        meeting_tag = " [🤫 Meeting]" if self.module_widget.is_meeting_mode_active() else ""
         if nearest:
             rem = max(0, int(nearest.target_time - time.time()))
             m, s = divmod(rem, 60)
             h, m = divmod(m, 60)
-            tooltip = f"Next: {nearest.name} ({h:02d}:{m:02d}:{s:02d})"
+            tooltip = f"Next: {nearest.name} ({h:02d}:{m:02d}:{s:02d}){meeting_tag}"
         else:
-            tooltip = f"{APP_TITLE}: All quiet"
+            tooltip = f"{APP_TITLE}: All quiet{meeting_tag}"
         self.tray.update_tooltip(tooltip)
 
     def _setup_hotkey(self) -> None:
@@ -2903,8 +3146,16 @@ class MainApp(QMainWindow):
             lambda: self.module_widget.bridge.toggleVisibilityRequested.emit(),
         )
         self._hotkey_listener.start()
-        shortcut = QShortcut(QKeySequence("Ctrl+F7"), self)
+        shortcut = QShortcut(QKeySequence("Ctrl+F8"), self)
         shortcut.activated.connect(self.toggle_visibility)
+
+        self._meeting_hotkey_listener = GlobalHotkeyListener(
+            MEETING_HOTKEY,
+            lambda: self.module_widget.bridge.toggleMeetingModeRequested.emit(),
+        )
+        self._meeting_hotkey_listener.start()
+        meeting_shortcut = QShortcut(QKeySequence("Ctrl+Shift+M"), self)
+        meeting_shortcut.activated.connect(self.module_widget._toggle_meeting_mode)
 
     def closeEvent(self, event) -> None:
         """Minimize to system tray when window [X] is clicked."""
@@ -2916,7 +3167,7 @@ class MainApp(QMainWindow):
         self.hide()
 
     def toggle_visibility(self) -> None:
-        """Minimize OR restore the GUI window when Ctrl+F7 (or tray toggle) is pressed."""
+        """Minimize OR restore the GUI window when Ctrl+F8 (or tray toggle) is pressed."""
         if self.isMinimized() or not self.isVisible():
             self.showNormal()
             self.raise_()
@@ -2931,6 +3182,8 @@ class MainApp(QMainWindow):
         Storage.save_config(self.module_widget.app_config)
         if hasattr(self, "_hotkey_listener") and self._hotkey_listener:
             self._hotkey_listener.stop()
+        if hasattr(self, "_meeting_hotkey_listener") and self._meeting_hotkey_listener:
+            self._meeting_hotkey_listener.stop()
         if self.module_widget.hud:
             self.module_widget.hud.close()
         if hasattr(self.module_widget, "ahk_manager") and self.module_widget.ahk_manager.is_running():
