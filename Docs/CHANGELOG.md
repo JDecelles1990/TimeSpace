@@ -5,6 +5,17 @@
 
 ---
 
+## [v3.16] — Taller Active Reminders Queue & Scroll Position Preservation (2026-11-15)
+- **Taller Active Reminders Queue on `1. Timers ⏳` & `2. RDV 📅` (`src/gui.py`, `src/calendar_widget.py`)**:
+  - Updated `TimerRendezVousWidget._on_main_tab_changed()` to hug the natural content height of Tab 1 (`Timers`) and Tab 2 (`RDV`) via `main_tabs.setMaximumHeight(...)` and allocate remaining root vertical stretch (`0` vs `10`) directly to `active_queue_group`.
+  - Restores flexible `QTabWidget` sizing (`16777215` max height, `5` vs `3` stretch) when switching to Tabs 3–7.
+  - Compacted `MiniCalendar` chip/navigation/day button height (`22px` -> `20px`) and grid spacing (`2px` -> `1px`) in `src/calendar_widget.py` so `2. RDV 📅` grants additional queue height.
+- **Scroll Position Snap-Back Fix (`src/gui.py`)**:
+  - Replaced destructive `.clear()` + `addItem()` rebuilds in `_refresh_loop()` and `_refresh_activity_tab()` with the shared in-place `_sync_list_rows()` helper.
+  - Preserves vertical/horizontal scrollbar positions and existing row selection on every 1-second live countdown update without jumping back to the top.
+
+---
+
 ## [v3.15] — Expanded RDV Early Alert Lead-Time Options (2026-11-15)
 - **Additional RDV Early Alert Presets (`src/config.py`, `src/__init__.py`, `src/scheduler.py`, `src/gui.py`)**:
   - Added `RDV_LEAD_OPTIONS` in `src/config.py` (re-exported in `src/__init__.py`) adding `45m before` (`45`), `1 hour before` (`60`), `2 hours before` (`120`), and `1 day before` (`1440`) alongside `0m`/`5m`/`10m`/`15m`.

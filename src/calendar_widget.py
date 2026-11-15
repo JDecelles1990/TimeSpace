@@ -46,7 +46,7 @@ class MiniCalendar(QWidget):
         ]:
             btn = QPushButton(label)
             btn.setCursor(Qt.CursorShape.PointingHandCursor)
-            btn.setFixedHeight(22)
+            btn.setFixedHeight(20)
             btn.clicked.connect(cmd)
             chip_row.addWidget(btn)
         main_layout.addLayout(chip_row)
@@ -56,7 +56,7 @@ class MiniCalendar(QWidget):
         nav_row.setSpacing(4)
 
         btn_prev = QPushButton("◀")
-        btn_prev.setFixedSize(28, 22)
+        btn_prev.setFixedSize(28, 20)
         btn_prev.setCursor(Qt.CursorShape.PointingHandCursor)
         btn_prev.clicked.connect(self._prev_month)
 
@@ -65,7 +65,7 @@ class MiniCalendar(QWidget):
         self.lbl_month_year.setStyleSheet(f"font-weight: bold; color: {COLORS['text']};")
 
         btn_next = QPushButton("▶")
-        btn_next.setFixedSize(28, 22)
+        btn_next.setFixedSize(28, 20)
         btn_next.setCursor(Qt.CursorShape.PointingHandCursor)
         btn_next.clicked.connect(self._next_month)
 
@@ -76,7 +76,7 @@ class MiniCalendar(QWidget):
 
         # Calendar grid
         self.grid_layout = QGridLayout()
-        self.grid_layout.setSpacing(2)
+        self.grid_layout.setSpacing(1)
         self.grid_layout.setContentsMargins(0, 0, 0, 0)
 
         day_names = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"]
@@ -137,7 +137,7 @@ class MiniCalendar(QWidget):
 
                 btn = QPushButton(day_text)
                 btn.setCursor(Qt.CursorShape.PointingHandCursor)
-                btn.setFixedHeight(22)
+                btn.setFixedHeight(20)
                 btn.setStyleSheet(
                     f"QPushButton {{ background-color: {bg_color}; color: {fg_color}; "
                     f"font-weight: {weight}; font-size: 11px; padding: 1px; border-radius: 3px; }}"

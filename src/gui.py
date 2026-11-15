@@ -700,14 +700,14 @@ class TimerRendezVousWidget(QWidget):
     # ── UI Construction ──────────────────────────────────────────────────────
 
     def _build_ui(self) -> None:
-        root_layout = QVBoxLayout(self)
-        root_layout.setContentsMargins(8, 6, 8, 6)
-        root_layout.setSpacing(4)
+        self.root_layout = QVBoxLayout(self)
+        self.root_layout.setContentsMargins(8, 6, 8, 6)
+        self.root_layout.setSpacing(4)
 
-        self._build_header(root_layout)
-        self._build_hero_deck(root_layout)
-        self._build_tabs(root_layout)
-        self._build_active_queue(root_layout)
+        self._build_header(self.root_layout)
+        self._build_hero_deck(self.root_layout)
+        self._build_tabs(self.root_layout)
+        self._build_active_queue(self.root_layout)
         self._on_main_tab_changed(self.main_tabs.currentIndex())
 
     def _build_header(self, parent_layout: QVBoxLayout) -> None:
@@ -891,6 +891,20 @@ class TimerRendezVousWidget(QWidget):
                 self.tab_history,
             )
             self.active_queue_group.setVisible(not hide_queue)
+
+        # Give remaining vertical space on Timers & RDV tabs to Active Reminders Queue
+        if current_tab in (self.tab_timers, self.tab_rdv):
+            tab_bar_h = self.main_tabs.tabBar().sizeHint().height()
+            page_h = current_tab.sizeHint().height()
+            self.main_tabs.setMaximumHeight(tab_bar_h + page_h + 10)
+            if hasattr(self, "root_layout") and hasattr(self, "active_queue_group"):
+                self.root_layout.setStretchFactor(self.main_tabs, 0)
+                self.root_layout.setStretchFactor(self.active_queue_group, 10)
+        else:
+            self.main_tabs.setMaximumHeight(16777215)
+            if hasattr(self, "root_layout") and hasattr(self, "active_queue_group"):
+                self.root_layout.setStretchFactor(self.main_tabs, 5)
+                self.root_layout.setStretchFactor(self.active_queue_group, 3)
 
     # ── Tab Navigation Keyboard Shortcuts (Keys 1 to 7) ──────────────────────
 
@@ -2826,14 +2840,52 @@ class TimerRendezVousWidget(QWidget):
 
     # ── 1-Second QTimer Live Refresh Loop ────────────────────────────────────
 
+    @staticmethod
+    def _sync_list_rows(
+        lb: QListWidget,
+        rows: List[Tuple[str, Optional[str], Optional[QColor]]],
+    ) -> None:
+        """Update a QListWidget in-place without clearing, preserving scrollbar positions."""
+        v_bar = lb.verticalScrollBar()
+        h_bar = lb.horizontalScrollBar()
+        saved_v = v_bar.value()
+        saved_h = h_bar.value()
+        cur_row = lb.currentRow()
+
+        while lb.count() > len(rows):
+            lb.takeItem(lb.count() - 1)
+
+        for idx, (row_text, tip_text, fg_color) in enumerate(rows):
+            if idx < lb.count():
+                item_widget = lb.item(idx)
+                if item_widget.text() != row_text:
+                    item_widget.setText(row_text)
+                if tip_text is not None and item_widget.toolTip() != tip_text:
+                    item_widget.setToolTip(tip_text)
+                if fg_color is not None:
+                    item_widget.setForeground(fg_color)
+            else:
+                item_widget = QListWidgetItem(row_text)
+                if tip_text is not None:
+                    item_widget.setToolTip(tip_text)
+                if fg_color is not None:
+                    item_widget.setForeground(fg_color)
+                lb.addItem(item_widget)
+
+        if 0 <= cur_row < lb.count() and lb.currentRow() != cur_row:
+            lb.setCurrentRow(cur_row)
+        if v_bar.value() != saved_v:
+            v_bar.setValue(saved_v)
+        if h_bar.value() != saved_h:
+            h_bar.setValue(saved_h)
+
     def _refresh_loop(self) -> None:
-        cur_row = self.listbox.currentRow()
-        self.listbox.clear()
         now = time.time()
 
         nearest_item: Optional[ScheduledItem] = None
         nearest_delta: float = 99999999.0
         active_timer: Optional[ScheduledItem] = None
+        queue_rows: List[Tuple[str, Optional[str], Optional[QColor]]] = []
 
         for it in self.scheduler.items:
             if it.is_paused:
@@ -2856,9 +2908,8 @@ class TimerRendezVousWidget(QWidget):
             rep = " 🔁" if (it.repeat_sec > 0 or it.repeat_rule != "none") else ""
             attach = (" 🔗" if it.url else "") + (" 📝" if it.note else "")
             ring_str = self._fmt_target(it, now)
-            item_widget = QListWidgetItem(
-                f"{icon} {status_prefix}{cat_icon}{it.name}{rep}{attach} — {h:02d}:{m:02d}:{s:02d}  (🔔 {ring_str})"
-            )
+            row_text = f"{icon} {status_prefix}{cat_icon}{it.name}{rep}{attach} — {h:02d}:{m:02d}:{s:02d}  (🔔 {ring_str})"
+
             tip_lines = [
                 f"{it.name} (double-click or click ✏️ to edit)",
                 f"🔔 Rings: {ring_str}",
@@ -2867,17 +2918,17 @@ class TimerRendezVousWidget(QWidget):
                 tip_lines.append(f"📝 {it.note}")
             if it.url:
                 tip_lines.append(f"🔗 {it.url}")
-            item_widget.setToolTip("\n".join(tip_lines))
 
             if not it.is_paused and remain < 60:
-                item_widget.setForeground(QColor(COLORS["accent_danger"]))
+                fg_color = QColor(COLORS["accent_danger"])
             elif not it.is_paused and remain < 300:
-                item_widget.setForeground(QColor(COLORS["accent_warning"]))
+                fg_color = QColor(COLORS["accent_warning"])
+            else:
+                fg_color = QColor(COLORS["text"])
 
-            self.listbox.addItem(item_widget)
+            queue_rows.append((row_text, "\n".join(tip_lines), fg_color))
 
-        if 0 <= cur_row < self.listbox.count():
-            self.listbox.setCurrentRow(cur_row)
+        self._sync_list_rows(self.listbox, queue_rows)
 
         total_active = len(self.scheduler.items)
         self.lbl_queue_status.setText(f"{total_active} active" if total_active else "All quiet")
@@ -2932,9 +2983,7 @@ class TimerRendezVousWidget(QWidget):
         timers = [it for it in self.scheduler.items if it.kind == "timer"]
         rdvs = [it for it in self.scheduler.items if it.kind == "rendez-vous"]
 
-        t_row = self.activity_timer_lb.currentRow()
-        self.activity_timer_lb.blockSignals(True)
-        self.activity_timer_lb.clear()
+        timer_rows: List[Tuple[str, Optional[str], Optional[QColor]]] = []
         self._activity_timer_items = timers
         for it in timers:
             rem = int(it.remaining_paused if it.is_paused else max(0.0, it.target_time - now))
@@ -2943,16 +2992,14 @@ class TimerRendezVousWidget(QWidget):
             p_badge = " ⏸" if it.is_paused else ""
             r_badge = " 🔁" if it.repeat_sec > 0 else ""
             a_badge = (" 🔗" if it.url else "") + (" 📝" if it.note else "")
-            self.activity_timer_lb.addItem(f"⏳{p_badge}{r_badge} {it.name}{a_badge} — {h:02d}:{m:02d}:{s:02d}")
-        if 0 <= t_row < self.activity_timer_lb.count():
-            self.activity_timer_lb.setCurrentRow(t_row)
+            timer_rows.append((f"⏳{p_badge}{r_badge} {it.name}{a_badge} — {h:02d}:{m:02d}:{s:02d}", None, None))
+        self.activity_timer_lb.blockSignals(True)
+        self._sync_list_rows(self.activity_timer_lb, timer_rows)
         self.activity_timer_lb.blockSignals(False)
         self._on_activity_timer_select()
         self.lbl_timer_count.setText(f"{len(timers)} active")
 
-        r_row = self.activity_rdv_lb.currentRow()
-        self.activity_rdv_lb.blockSignals(True)
-        self.activity_rdv_lb.clear()
+        rdv_rows: List[Tuple[str, Optional[str], Optional[QColor]]] = []
         self._activity_rdv_items = rdvs
         for it in rdvs:
             rem = int(it.remaining_paused if it.is_paused else max(0.0, it.target_time - now))
@@ -2961,9 +3008,9 @@ class TimerRendezVousWidget(QWidget):
             cat_icon = it.category.split()[0] if it.category and it.category not in ("General", "📌 General") else "📌"
             r_badge = " 🔁" if it.repeat_rule and it.repeat_rule != "none" else ""
             a_badge = (" 🔗" if it.url else "") + (" 📝" if it.note else "")
-            self.activity_rdv_lb.addItem(f"{cat_icon}{r_badge} {it.name}{a_badge} — {h:02d}:{m:02d}:{s:02d}")
-        if 0 <= r_row < self.activity_rdv_lb.count():
-            self.activity_rdv_lb.setCurrentRow(r_row)
+            rdv_rows.append((f"{cat_icon}{r_badge} {it.name}{a_badge} — {h:02d}:{m:02d}:{s:02d}", None, None))
+        self.activity_rdv_lb.blockSignals(True)
+        self._sync_list_rows(self.activity_rdv_lb, rdv_rows)
         self.activity_rdv_lb.blockSignals(False)
         self._on_activity_rdv_select()
         self.lbl_rdv_count.setText(f"{len(rdvs)} scheduled")
