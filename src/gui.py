@@ -2298,8 +2298,10 @@ class TimerRendezVousWidget(QWidget):
         h, m = divmod(m, 60)
         return f"{prefix}{h:02d}:{m:02d}:{s:02d}"
 
-    def _fmt_target(self, item: ScheduledItem) -> str:
-        return datetime.datetime.fromtimestamp(item.target_time).strftime("%b %d %H:%M:%S")
+    def _fmt_target(self, item: ScheduledItem, now: Optional[float] = None) -> str:
+        ref_now = time.time() if now is None else now
+        target_ts = (ref_now + item.remaining_paused) if item.is_paused else item.target_time
+        return datetime.datetime.fromtimestamp(target_ts).strftime("%a, %b %d • %H:%M:%S")
 
     def _on_activity_timer_select(self) -> None:
         row = self.activity_timer_lb.currentRow()
@@ -2846,10 +2848,14 @@ class TimerRendezVousWidget(QWidget):
             icon = "⏳" if it.kind == "timer" else "📅"
             rep = " 🔁" if (it.repeat_sec > 0 or it.repeat_rule != "none") else ""
             attach = (" 🔗" if it.url else "") + (" 📝" if it.note else "")
+            ring_str = self._fmt_target(it, now)
             item_widget = QListWidgetItem(
-                f"{icon} {status_prefix}{cat_icon}{it.name}{rep}{attach} — {h:02d}:{m:02d}:{s:02d}"
+                f"{icon} {status_prefix}{cat_icon}{it.name}{rep}{attach} — {h:02d}:{m:02d}:{s:02d}  (🔔 {ring_str})"
             )
-            tip_lines = [f"{it.name} (double-click or click ✏️ to edit)"]
+            tip_lines = [
+                f"{it.name} (double-click or click ✏️ to edit)",
+                f"🔔 Rings: {ring_str}",
+            ]
             if it.note:
                 tip_lines.append(f"📝 {it.note}")
             if it.url:

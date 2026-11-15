@@ -5,6 +5,13 @@
 
 ---
 
+## [v3.13] — Active Reminders Queue Ring Date, Day of Week & Time Display (2026-11-15)
+- **Active Reminders Queue Ring Timestamp (`src/gui.py`)**:
+  - Updated `TimerRendezVousWidget._fmt_target(item, now)` to format the target ring time with abbreviated day of the week, calendar date, and clock time (`%a, %b %d • %H:%M:%S`) while projecting `now + remaining_paused` for paused items.
+  - Updated `_refresh_loop()` so every row in the Active Reminders Queue (`self.listbox`) appends `(🔔 Day, Mon DD • HH:MM:SS)` alongside the live countdown (`HH:MM:SS`) and displays `🔔 Rings: Day, Mon DD • HH:MM:SS` in its hover tooltip.
+
+---
+
 ## [v3.12] — Discreet Meeting Mode & Native Windows Microphone Activity Detector (2026-11-11)
 - **Zero-Dependency Native Windows Microphone Activity Detector (`src/meeting_detector.py`)**:
   - Added `is_microphone_in_use() -> bool` and `get_active_microphone_apps() -> List[str]` monitoring `HKCU\Software\Microsoft\Windows\CurrentVersion\CapabilityAccessManager\ConsentStore\microphone` (`NonPackaged` & `Packaged`).

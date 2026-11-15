@@ -121,7 +121,7 @@
 
 ## 3. Persistent Queue, Notifications, HUD & Shortcuts
 
-- **Active Reminders Queue (Bottom Panel)**: Visible on Tabs 1 (`Timers`), 2 (`RDV`), and 7 (`Settings`), and automatically hidden on Tabs 3 (`Activity`), 4 (`Scratchpad`), 5 (`Go`), and 6 (`History`) to maximize workspace height. Double-click any item (or click **`✏️`**) to edit its live details inline.
+- **Active Reminders Queue (Bottom Panel)**: Visible on Tabs 1 (`Timers`), 2 (`RDV`), and 7 (`Settings`), and automatically hidden on Tabs 3 (`Activity`), 4 (`Scratchpad`), 5 (`Go`), and 6 (`History`) to maximize workspace height. Displays each reminder's live countdown alongside the exact day of the week, date, and time it will ring (`🔔 Day, Mon DD • HH:MM:SS`). Double-click any item (or click **`✏️`**) to edit its live details inline.
 - **Bottom-Right Alarm Popup**: Triggers as a compact frameless card above the Windows system tray alongside a Windows Action Center toast.
 - **Missed & Sleep-Wake Alerts**: Automatically notifies you on startup or PC wake-up if reminders elapsed while the app was closed or the PC was asleep.
 - **📌 Floating Mini HUD**: Draggable always-on-top desktop pill showing the nearest countdown.

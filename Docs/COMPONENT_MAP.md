@@ -109,7 +109,7 @@ MainApp (QMainWindow — standalone shell, minSize=480x540, opacity=AppConfig.ap
       │    ├── Tab 6 ("6. History 📜"): Full-height HistoryListWidget (Delete key or [🗑️] removes selected items, [🔗], [📋], [🧹])
       │    └── Tab 7 ("7. Settings ⚙️"): Alarm Tone + [🔊], Master Volume, App Transparency QSlider (45–100%, synced with Header), Popup & HUD Opacity QSlider (60–100%), Audio File [📂], Escalation, Boot Startup, Snooze, [💾], ⌨️ AutoHotkey v2 Text Expanders Group ([⚡ Set Up & Edit AHK v2 Hotstrings...], [▶️ Run], [⏹️ Stop], Auto-start Checkbox)
       ├── Active Reminders Queue (QGroupBox, visible on Tabs 1, 2, 7; hidden on Tabs 3, 4, 5, 6):
-      │    └── Queue status + [⏸️] + [✏️] + [🗑️] + multi-row QListWidget (double-click any item to edit inline)
+      │    └── Queue status + [⏸️] + [✏️] + [🗑️] + multi-row QListWidget (countdown + target ring day/date/time; double-click to edit inline)
       └── Top-Level Overlays (spawned on demand, controlled by AppConfig.overlay_opacity):
            ├── FloatingMiniHUD (QWidget, frameless always-on-top)
            ├── AlarmDialog (QDialog, frameless bottom-right dynamic-height vertical stack)
