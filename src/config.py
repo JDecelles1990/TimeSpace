@@ -81,6 +81,17 @@ QUICK_TIMER_PRESETS: List[Tuple[str, int]] = [
     ("2h", 120),
 ]
 
+RDV_LEAD_OPTIONS: List[Tuple[str, int]] = [
+    ("At time (0m)", 0),
+    ("5m before", 5),
+    ("10m before", 10),
+    ("15m before", 15),
+    ("45m before", 45),
+    ("1 hour before", 60),
+    ("2 hours before", 120),
+    ("1 day before", 1440),
+]
+
 SNOOZE_OPTIONS: List[int] = [5, 10, 15, 30]
 
 SCRATCHPAD_TEXT_COLORS: List[Tuple[str, str]] = [

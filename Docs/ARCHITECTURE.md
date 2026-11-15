@@ -21,6 +21,7 @@ The UI layer in `src/gui.py` is split into two distinct classes to support both 
 2. **Standalone Application Shell (`MainApp(QMainWindow)` & `run.py`)**:
    - Wraps `TimerRendezVousWidget` as its central widget (`650x800`, min `600x720`).
    - Adds `TrayManager` (`pystray`), `GlobalHotkeyListener` (`Ctrl+F8` window toggle, `Ctrl+Shift+M` meeting mode), 1-second tray tooltip synchronization, `--minimized` startup flag support, and `closeEvent` interception (hides to tray instead of terminating).
+   - **Boot Working Directory & Single-Instance Mutex (`run.py`)**: Normalizes the process working directory to the repository root (`os.chdir(PROJECT_DIR)`) before importing Qt so relative `data/` and `.venv/` paths resolve even when launched from `C:\Windows\System32` at boot, and acquires a Win32 kernel mutex (`Local\TimeSpace_SingleInstance_Mutex`) via `_acquire_single_instance_mutex()` so duplicate startup triggers exit cleanly without spawning redundant tray icons.
    - **Virtualenv Auto-Relaunch (`run.py`)**: `_ensure_pyside6_interpreter()` checks `import PySide6` at startup; if launched from a global Python interpreter missing `PySide6`, it transparently re-executes the script with `.venv\Scripts\python.exe` while forwarding CLI arguments.
 
 ---
@@ -84,7 +85,10 @@ PySide6 forbids touching `QWidget` instances from non-GUI threads. All backgroun
 - **Sleep / Hibernation Drift Detector**: `_run_loop()` compares `gap = now - last_tick` every `500ms`. If `gap > 6.0` seconds (indicating OS suspend/hibernate), any non-paused item with `target_time < now` triggers `on_wake_missed_callback` -> `SchedulerBridge.wakeMissed`.
 
 ### 3.5 Windows Boot Auto-Start (`src/startup.py`)
-- Writes or removes `"<pythonw.exe>" "<run.py>" --minimized` under `HKCU\Software\Microsoft\Windows\CurrentVersion\Run` (`TimeSpace`), preferring `pythonw.exe` inside `.venv\Scripts` so boot startup never flashes a console window.
+- Registers dual boot auto-launch entries so Windows starts TimeSpace reliably on user sign-in:
+  1. Writes `"<pythonw.exe>" "<run.py>" --minimized` under `HKCU\Software\Microsoft\Windows\CurrentVersion\Run` (`TimeSpace`), preferring `.venv\Scripts\pythonw.exe` to avoid console window flashes, and writes the enabled binary state (`[2, 0, ...]`) under `HKCU\Software\Microsoft\Windows\CurrentVersion\Explorer\StartupApproved\Run`.
+  2. Writes a windowless VBScript launcher (`TimeSpace.vbs`) inside `%APPDATA%\Microsoft\Windows\Start Menu\Programs\Startup` with `WshShell.CurrentDirectory` set to the TimeSpace project root.
+- Pairwise de-duplication is guaranteed by `run.py`'s `Local\TimeSpace_SingleInstance_Mutex` kernel lock. Disabling startup removes both the registry value and the Startup folder `.vbs` launcher.
 
 ### 3.6 Discreet Meeting Mode & Native Windows Microphone Activity Detector (`src/meeting_detector.py`)
 - **Zero-Dependency Win32 Registry Inspection**: Queries `HKCU\Software\Microsoft\Windows\CurrentVersion\CapabilityAccessManager\ConsentStore\microphone` (`NonPackaged` and `Packaged` subkeys). When Windows or any conference tool (Teams, Zoom, Webex, Google Meet, Slack, Discord, Chrome/Edge) actively captures audio from the microphone, Windows sets `LastUsedTimeStop == 0` and `LastUsedTimeStart > 0`.

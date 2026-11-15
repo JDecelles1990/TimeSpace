@@ -18,10 +18,12 @@
 
 | Input Category | Example Expressions | Result |
 |---|---|---|
-| **Countdown Timers** | `Ring in 15 min` · `Check backups in 45m` · `Remind me in 10 minutes to call John` · `Timer for 30m review` | Starts a countdown timer immediately |
-| **Same / Next Day RDV** | `RDV at 4PM` · `Call Linda at 7:15 tomorrow morning` · `at 18:30 dinner` · `at 8 tonight backup check` | Schedules a calendar Rendez-vous (auto-advances to tomorrow if today's time has passed) |
-| **Relative Days / Weeks** | `Call Sam in 2 days` · `Call Sam in 2 days at 3pm` · `Follow up in 1 week at 10am` | Schedules a Rendez-vous `N` days/weeks ahead (defaults to `12:00` if no time specified) |
-| **Next Weekday RDV** | `Dentist next Friday` · `Dentist next Friday at 14:00` · `Meeting on Wednesday at 3pm` | Schedules a Rendez-vous on the upcoming target weekday |
+| **Countdown Timers** | `Ring in 15 min` · `Check backups in 45m` · `Remind me in half an hour to check backup` · `Timer for 30m review` | Starts a countdown timer immediately (supports `in an hour`, `in a minute`, `in half an hour`) |
+| **Same / Next Day RDV** | `RDV at 4PM` · `Set an alarm at 7am to stretch` · `Call Linda at 7:15 tomorrow morning` · `at noon lunch` · `at 18:30 dinner` | Schedules a calendar Rendez-vous (auto-advances to tomorrow if today's time has passed) |
+| **Relative Days / Weeks** | `Call Sam in 2 days` · `Call Sam in 2 days at 3pm` · `Call client day after tomorrow at 14h30` · `Follow up in 1 week at 10am` | Schedules a Rendez-vous `N` days/weeks ahead (defaults to `12:00` if no time specified) |
+| **Weekday + Ordinal Day** | `Set an alarm for Friday the 13th at 2:15 PM` · `Set an alarm for Friday the 13th at2:15 PM` · `Meeting on Monday the 16th at 10am` | Finds the next calendar date matching both the target weekday and ordinal day of the month |
+| **Ordinal Day / Calendar Dates** | `Set an alarm for the 13th at 2:15 PM` · `Pay rent on the 1st at 9am` · `Dentist on Nov 20th at 2:15 PM` · `13th of December at 10am` · `Dentist on 2026-12-05 at 14:00` · `Call client on 11/20 at 3pm` | Resolves exact ISO (`YYYY-MM-DD`), numeric (`MM/DD`), Month+Day, or next upcoming ordinal day of the month |
+| **Weekday Phrases** | `Dentist next Friday at 14:00` · `Set an alarm for Friday at 2:15 PM` · `this Friday at 3pm` · `Meeting on Wednesday at 3pm` | Schedules a Rendez-vous on the upcoming target weekday (supports conversational prefixes and `at2:15 PM` / `14h30` time notation) |
 
 ---
 
@@ -44,7 +46,7 @@
   - **Event**: Subject, client name, or ticket reference.
   - **Time Picker**: Responsive grid with **`−1h`** / **`+1h`** steppers, minute chips (`:00`, `:15`, `:30`, `:45`), and hour presets (`09:00`, `12:00`, `14:00`, `17:00`, `18:00`) that never overlap when the window is resized down to `480×540`.
   - **🔗 Link & 📝 Short Note** *(Optional)*: Attach a meeting link (Teams/Zoom/Meet), ticket URL, or local file/folder path plus a brief note.
-  - **Cat, Alert & Repeat**: Tag with a category, set an early lead-time (`At time (0m)`, `5m`, `10m`, or `15m before`), and optionally repeat (`None`, `Daily`, `Weekly`, `Monthly`).
+  - **Cat, Alert & Repeat**: Tag with a category, set an early lead-time (`At time (0m)`, `5m`, `10m`, `15m`, `45m`, `1 hour`, `2 hours`, or `1 day before`), and optionally repeat (`None`, `Daily`, `Weekly`, `Monthly`).
   - **Compact Actions & Inline RDV Editing**: Click **`📤 .ics`** (Export), **`📥 .ics`** (Import), **`✏️`** (Edit active RDV), or **`➕ RDV`** (switches to **`💾 RDV`** when editing an existing appointment).
 
 ### Tab 3 — `3. Activity 📋` (Live Dual-Column Dashboard)

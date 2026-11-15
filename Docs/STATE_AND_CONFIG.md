@@ -50,7 +50,7 @@ Persisted as a JSON array in `data/reminders.json` via `Storage.load_reminders()
 | `is_paused` | `bool` | `False` | Whether countdown progression is currently frozen. |
 | `remaining_paused` | `float` | `0.0` | Remaining seconds captured at pause time; restores `target_time = now + remaining_paused` on resume. |
 | `category` | `str` | `"General"` | Category badge string from `CATEGORIES`. |
-| `lead_time_min` | `int` | `0` | Early warning offset in minutes (`0`, `5`, `10`, `15`) subtracted from initial `target_time`. |
+| `lead_time_min` | `int` | `0` | Early warning offset in minutes (`0`, `5`, `10`, `15`, `45`, `60`, `120`, `1440` from `RDV_LEAD_OPTIONS`) subtracted from initial `target_time`. |
 | `url` | `str` | `""` | Optional web URL, bare domain, custom protocol URI, or local Windows file/folder path for 1-click launching. |
 | `note` | `str` | `""` | Optional short text note surfaced on `AlarmDialog`, `Activity`, `History`, and `.ics` `DESCRIPTION`. |
 | `anchor_day` | `int` | `0` | Original calendar day-of-month (`1`–`31`) preserved across shorter months for `"monthly"` recurrence (`Jan 31 -> Feb 28/29 -> Mar 31`). |
@@ -128,6 +128,7 @@ Persisted as a JSON array in `data/hotstrings.json` via `Storage.load_hotstrings
 
 ### 2.4 Shared Domain Presets
 - `QUICK_TIMER_PRESETS`: `[("15m", 15), ("30m", 30), ("1h", 60), ("2h", 120)]`
+- `RDV_LEAD_OPTIONS`: `[("At time (0m)", 0), ("5m before", 5), ("10m before", 10), ("15m before", 15), ("45m before", 45), ("1 hour before", 60), ("2 hours before", 120), ("1 day before", 1440)]`
 - `CATEGORIES`: `["📌 General", "💼 Work", "📞 Callback", "🔄 Follow-up", "🎫 Ticket", "🩺 Health", "🏠 Personal"]`
 - `SNOOZE_OPTIONS`: `[5, 10, 15, 30]` (minutes)
 - `SOUND_PRESETS`: `{"gentle": ..., "digital": ..., "urgent": ..., "custom": ...}`

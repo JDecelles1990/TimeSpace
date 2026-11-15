@@ -1,4 +1,5 @@
 """Thread-safe Timer & Rendez-vous scheduler with pause/resume, inline editing, categories, attachments, and repeating rules."""
+import re
 import time
 import uuid
 import calendar
@@ -7,6 +8,25 @@ import threading
 from dataclasses import dataclass, asdict, replace
 from typing import List, Callable, Dict, Any, Optional, Set
 from src.storage import Storage
+
+_EARLY_PREFIX_RE = re.compile(r"^\[\d+[mhd] Early\]\s*")
+
+
+def _format_early_badge(lead_time_min: int) -> str:
+    """Format an early-alert badge string using m, h, or d units."""
+    if lead_time_min >= 1440 and lead_time_min % 1440 == 0:
+        return f"[{lead_time_min // 1440}d Early]"
+    if lead_time_min >= 60 and lead_time_min % 60 == 0:
+        return f"[{lead_time_min // 60}h Early]"
+    return f"[{lead_time_min}m Early]"
+
+
+def _apply_early_badge(name: str, lead_time_min: int) -> str:
+    """Strip any existing early-alert prefix and prepend the active badge when lead_time_min > 0."""
+    base_name = _EARLY_PREFIX_RE.sub("", name.strip()) or "Untitled Reminder"
+    if lead_time_min > 0:
+        return f"{_format_early_badge(lead_time_min)} {base_name}"
+    return base_name
 
 
 @dataclass
@@ -101,6 +121,7 @@ class ReminderScheduler:
         note: str = "",
         anchor_day: int = 0,
     ) -> str:
+        lead_time_min = max(0, int(lead_time_min))
         item_id = str(uuid.uuid4())
         now_ts = time.time()
         intended_event_ts = now_ts + seconds_from_now
@@ -108,9 +129,7 @@ class ReminderScheduler:
         target = now_ts + effective_seconds
         dur = original_duration if original_duration > 0 else max(1.0, effective_seconds)
 
-        annotated_name = name or "Untitled Reminder"
-        if lead_time_min > 0 and not annotated_name.startswith(f"[{lead_time_min}m Early]"):
-            annotated_name = f"[{lead_time_min}m Early] {annotated_name}"
+        annotated_name = _apply_early_badge(name or "Untitled Reminder", lead_time_min)
 
         computed_anchor = anchor_day
         if computed_anchor <= 0 and repeat_rule.lower() == "monthly":
@@ -163,13 +182,8 @@ class ReminderScheduler:
                 if it.id == item_id:
                     if lead_time_min is not None:
                         it.lead_time_min = max(0, int(lead_time_min))
-                    if name is not None:
-                        import re
-                        base_name = re.sub(r"^\[\d+m Early\]\s*", "", name.strip()) or "Untitled Reminder"
-                        if it.lead_time_min > 0:
-                            it.name = f"[{it.lead_time_min}m Early] {base_name}"
-                        else:
-                            it.name = base_name
+                    if name is not None or lead_time_min is not None:
+                        it.name = _apply_early_badge(name if name is not None else it.name, it.lead_time_min)
                     if seconds_from_now is not None and seconds_from_now > 0:
                         eff = max(1.0, float(seconds_from_now) - (it.lead_time_min * 60))
                         if it.is_paused:

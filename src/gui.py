@@ -61,6 +61,7 @@ from src.config import (
     SOUND_PRESETS,
     CATEGORIES,
     QUICK_TIMER_PRESETS,
+    RDV_LEAD_OPTIONS,
     SNOOZE_OPTIONS,
     SCRATCHPAD_TEXT_COLORS,
     AppConfig,
@@ -68,7 +69,7 @@ from src.config import (
     ScratchpadState,
 )
 from src.storage import Storage
-from src.scheduler import ReminderScheduler, ScheduledItem
+from src.scheduler import ReminderScheduler, ScheduledItem, _format_early_badge
 from src.sound import SoundPlayer
 from src.tray import TrayManager
 from src.notifications import show_toast
@@ -812,7 +813,9 @@ class TimerRendezVousWidget(QWidget):
         nl_row.setSpacing(4)
         self.smart_entry = QLineEdit()
         self.smart_entry.setMinimumWidth(0)
-        self.smart_entry.setPlaceholderText("e.g. 'Ring in 20m', 'Call client in 2 days', 'RDV at 14:30'")
+        self.smart_entry.setPlaceholderText(
+            "e.g. 'Ring in 20m', 'Set an alarm for Friday the 13th at 2:15 PM', 'RDV at 14:30'"
+        )
         self.smart_entry.returnPressed.connect(self._on_smart_input_submit)
         nl_row.addWidget(self.smart_entry, 1)
 
@@ -826,7 +829,9 @@ class TimerRendezVousWidget(QWidget):
         nl_row.addWidget(btn_create)
         right_col.addLayout(nl_row)
 
-        self.smart_feedback = QLabel("Tip: 'in 30m', 'in 3 days', 'tomorrow at 9am', or use tabs 1–7 below")
+        self.smart_feedback = QLabel(
+            "Tip: 'in 30m', 'Friday the 13th at 2:15 PM', 'Nov 20 at 9am', or use tabs 1–7"
+        )
         self.smart_feedback.setWordWrap(True)
         self.smart_feedback.setStyleSheet(f"color: {COLORS['text_muted']}; font-size: 11px; border: none;")
         right_col.addWidget(self.smart_feedback)
@@ -1092,7 +1097,7 @@ class TimerRendezVousWidget(QWidget):
     @staticmethod
     def _split_timer_label(full_name: str) -> Tuple[str, str]:
         """Extract optional '[Ref] Task' into (ref, task) for inline editing."""
-        cleaned = re.sub(r"^\[\d+m Early\]\s*", "", full_name.strip())
+        cleaned = re.sub(r"^\[\d+[mhd] Early\]\s*", "", full_name.strip())
         m = re.match(r"^\[([^\]]+)\]\s*(.*)$", cleaned)
         if m:
             return m.group(1).strip(), m.group(2).strip()
@@ -1194,7 +1199,8 @@ class TimerRendezVousWidget(QWidget):
         meta_grid.addWidget(QLabel("Alert:"), 1, 0)
         self.combo_rdv_lead = QComboBox()
         self.combo_rdv_lead.setMinimumWidth(0)
-        self.combo_rdv_lead.addItems(["At time (0m)", "5m before", "10m before", "15m before"])
+        for label, mins in RDV_LEAD_OPTIONS:
+            self.combo_rdv_lead.addItem(label, mins)
         meta_grid.addWidget(self.combo_rdv_lead, 1, 1)
 
         meta_grid.addWidget(QLabel("Repeat:"), 1, 2)
@@ -1799,7 +1805,9 @@ class TimerRendezVousWidget(QWidget):
         query = self.smart_entry.text().strip()
         parsed = NaturalParser.parse(query)
         if not parsed:
-            self.smart_feedback.setText('❌ Unrecognized. Try: "Ring in 15 min", "Call Sam in 2 days", "RDV at 4PM"')
+            self.smart_feedback.setText(
+                '❌ Unrecognized. Try: "Ring in 15 min", "Set an alarm for Friday the 13th at 2:15 PM", "RDV at 4PM"'
+            )
             self.smart_feedback.setStyleSheet(f"color: {COLORS['accent_danger']}; font-size: 11px; border: none;")
             return
 
@@ -1916,7 +1924,7 @@ class TimerRendezVousWidget(QWidget):
     def _begin_edit_rdv(self, item: ScheduledItem) -> None:
         """Populate Tab 2 inputs from an active ScheduledItem (rendez-vous) and switch ➕ RDV to 💾 RDV."""
         self._editing_rdv_id = item.id
-        clean_name = re.sub(r"^\[\d+m Early\]\s*", "", item.name.strip())
+        clean_name = re.sub(r"^\[\d+[mhd] Early\]\s*", "", item.name.strip())
         self.entry_rdv_name.setText(clean_name)
         self.entry_rdv_url.setText(item.url)
         self.entry_rdv_note.setText(item.note)
@@ -1930,8 +1938,8 @@ class TimerRendezVousWidget(QWidget):
         if cat_idx >= 0:
             self.combo_rdv_cat.setCurrentIndex(cat_idx)
 
-        lead_map = {0: 0, 5: 1, 10: 2, 15: 3}
-        self.combo_rdv_lead.setCurrentIndex(lead_map.get(item.lead_time_min, 0))
+        lead_idx = self.combo_rdv_lead.findData(item.lead_time_min)
+        self.combo_rdv_lead.setCurrentIndex(lead_idx if lead_idx >= 0 else 0)
 
         rep_idx = self.combo_rdv_repeat.findText((item.repeat_rule or "none").capitalize())
         if rep_idx >= 0:
@@ -2008,8 +2016,7 @@ class TimerRendezVousWidget(QWidget):
         url = self.entry_rdv_url.text().strip()
         note = self.entry_rdv_note.text().strip()
 
-        lead_str = self.combo_rdv_lead.currentText()
-        lead_time = 5 if "5m" in lead_str else (10 if "10m" in lead_str else (15 if "15m" in lead_str else 0))
+        lead_time = int(self.combo_rdv_lead.currentData() or 0)
 
         dt = datetime.datetime.combine(d_val, datetime.time(h, m))
         delta = (dt - datetime.datetime.now()).total_seconds()
@@ -2327,7 +2334,7 @@ class TimerRendezVousWidget(QWidget):
             now = time.time()
             cat = it.category if it.category and it.category != "General" else "—"
             rep = it.repeat_rule.capitalize() if it.repeat_rule and it.repeat_rule != "none" else "None"
-            lead = f"{it.lead_time_min}m early" if it.lead_time_min else "On time"
+            lead = _format_early_badge(it.lead_time_min).strip("[]").lower() if it.lead_time_min else "On time"
             parts = [
                 f"📌 {it.name}",
                 f"⏱ {self._fmt_remain(it, now)}",

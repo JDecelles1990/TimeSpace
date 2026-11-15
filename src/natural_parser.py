@@ -1,11 +1,11 @@
 """Natural language parser for smart quick timer and rendez-vous input with expanded vocabulary."""
-import re
+import calendar
 import datetime
-import time
-from typing import Optional, Dict, Any, Tuple
+import re
+from typing import Any, Dict, Optional, Tuple
 
 # ---------------------------------------------------------------------------
-# Helpers
+# Helpers & Lookup Tables
 # ---------------------------------------------------------------------------
 
 _WEEKDAY_MAP = {
@@ -18,9 +18,30 @@ _WEEKDAY_MAP = {
     "sunday": 6, "sun": 6,
 }
 
-# Regex that matches "at HH:MM", "at 4pm", "at 9", "4:30pm", "18:30" etc.
+_MONTH_MAP = {
+    "january": 1, "jan": 1,
+    "february": 2, "feb": 2,
+    "march": 3, "mar": 3,
+    "april": 4, "apr": 4,
+    "may": 5,
+    "june": 6, "jun": 6,
+    "july": 7, "jul": 7,
+    "august": 8, "aug": 8,
+    "september": 9, "sep": 9, "sept": 9,
+    "october": 10, "oct": 10,
+    "november": 11, "nov": 11,
+    "december": 12, "dec": 12,
+}
+
+_MONTH_PATTERN = "|".join(sorted(_MONTH_MAP.keys(), key=len, reverse=True))
+_WEEKDAY_PATTERN = "|".join(sorted(_WEEKDAY_MAP.keys(), key=len, reverse=True))
+
+# Matches "at HH:MM", "at2:15 PM", "@ 3pm", "14h30", "9h", "4:30pm", "18:30", etc.
 _TIME_RE = re.compile(
-    r"(?:\bat\s+)?(\d{1,2})(?::(\d{2}))?\s*(am|pm)?\b",
+    r"(?:(?:\bat(?:\s+|(?=\d))|@\s*))?"
+    r"(\d{1,2})"
+    r"(?:(?::(\d{2}))|(h(\d{2})?))?"
+    r"\s*(am|pm)?\b",
     re.IGNORECASE,
 )
 
@@ -29,18 +50,75 @@ _DURATION_UNIT_RE = re.compile(
     re.IGNORECASE,
 )
 
+_CONVERSATIONAL_PREFIXES = (
+    (re.compile(r"^(?:create|add|set)\s+(?:an?\s+|the\s+)?alarm(?:\s+(?:for|on|to))?\s+", re.IGNORECASE), "Alarm"),
+    (re.compile(r"^(?:create|add|set)\s+(?:an?\s+|the\s+)?reminder(?:\s+(?:for|on|to))?\s+", re.IGNORECASE), "Reminder"),
+    (re.compile(r"^(?:create|add|set)\s+(?:an?\s+|the\s+)?timer(?:\s+(?:for|on|to))?\s+", re.IGNORECASE), "Quick Timer"),
+    (re.compile(r"^remind\s+me(?:\s+(?:on|for|to))?\s+", re.IGNORECASE), "Reminder"),
+    (re.compile(r"^schedule\s+(?:an?\s+)?(?:(meeting|rdv|rendez-vous|appointment|call|alarm|reminder)\s+)?(?:(?:for|on|to)\s+)?", re.IGNORECASE), "Meeting"),
+    (re.compile(r"^wake\s+me\s+up(?:\s+(?:on|for))?\s+", re.IGNORECASE), "Wake Up Alarm"),
+)
+
 
 def _next_weekday(from_date: datetime.date, weekday: int) -> datetime.date:
-    """Return the next occurrence of *weekday* (0=Monday … 6=Sunday) after *from_date*."""
+    """Return the next occurrence of *weekday* (0=Monday … 6=Sunday) strictly after *from_date*."""
     days_ahead = (weekday - from_date.weekday()) % 7
     if days_ahead == 0:
         days_ahead = 7
     return from_date + datetime.timedelta(days=days_ahead)
 
 
+def _next_weekday_and_day(
+    now: datetime.datetime,
+    weekday: int,
+    day_num: int,
+    hour: int,
+    minute: int,
+) -> Optional[datetime.date]:
+    """Return the next date matching both *weekday* and calendar *day_num* strictly in the future."""
+    if not (1 <= day_num <= 31):
+        return None
+    start = now.date()
+    days_to_wd = (weekday - start.weekday()) % 7
+    cand = start + datetime.timedelta(days=days_to_wd)
+    for _ in range(520):  # ~10 years of weekly steps
+        if cand.day == day_num:
+            cand_dt = datetime.datetime.combine(cand, datetime.time(hour, minute))
+            if cand_dt > now:
+                return cand
+        cand += datetime.timedelta(days=7)
+    return None
+
+
+def _next_day_of_month(
+    now: datetime.datetime,
+    day_num: int,
+    hour: int,
+    minute: int,
+) -> Optional[datetime.date]:
+    """Return the next upcoming date whose calendar day is *day_num* strictly in the future."""
+    if not (1 <= day_num <= 31):
+        return None
+    year, month = now.year, now.month
+    for _ in range(48):  # up to 4 years (handles the 29th of Feb, 31st, etc.)
+        max_day = calendar.monthrange(year, month)[1]
+        if day_num <= max_day:
+            cand = datetime.date(year, month, day_num)
+            cand_dt = datetime.datetime.combine(cand, datetime.time(hour, minute))
+            if cand_dt > now:
+                return cand
+        month += 1
+        if month > 12:
+            month = 1
+            year += 1
+    return None
+
+
 def _parse_time_str(h: int, m: int, ampm: Optional[str], tod: Optional[str], is_tonight: bool) -> Optional[int]:
     """Resolve final 24-h hour from raw parsed components.  Returns None on invalid input."""
     if ampm:
+        if h == 0 or h > 12:
+            return None
         mer = ampm.lower()
         if mer == "pm" and h < 12:
             h += 12
@@ -62,6 +140,40 @@ def _parse_time_str(h: int, m: int, ampm: Optional[str], tod: Optional[str], is_
     return h
 
 
+def _normalize_natural_idioms(text: str) -> str:
+    """Normalize friendly idioms like 'half an hour', 'an hour', and 'day after tomorrow'."""
+    out = re.sub(r"\b(?:the\s+)?day\s+after\s+tomorrow\b", "in 2 days", text, flags=re.IGNORECASE)
+    out = re.sub(r"\b(in|for)\s+(?:half\s+an\s+hour|a\s+half\s+hour)\b", r"\1 30 minutes", out, flags=re.IGNORECASE)
+    out = re.sub(r"\b(in|for)\s+an?\s+hour\b", r"\1 1 hour", out, flags=re.IGNORECASE)
+    out = re.sub(r"\b(in|for)\s+a\s+minute\b", r"\1 1 minute", out, flags=re.IGNORECASE)
+    out = re.sub(r"\b(in|for)\s+a\s+second\b", r"\1 1 second", out, flags=re.IGNORECASE)
+    return " ".join(out.split())
+
+
+def _strip_conversational_prefix(text: str) -> Tuple[str, Optional[str]]:
+    """Strip leading scheduling verbs ('Set an alarm for...', 'Remind me on...') and infer a default label."""
+    for regex, default_label in _CONVERSATIONAL_PREFIXES:
+        m = regex.match(text)
+        if m:
+            label = default_label
+            if m.lastindex and m.group(1):
+                matched_noun = m.group(1).lower()
+                label = "RDV" if matched_noun == "rdv" else matched_noun.capitalize()
+            return text[m.end():].strip(), label
+    return text, None
+
+
+def _clean_task_name(raw_name: str, fallback: str) -> str:
+    """Tidy leftover leading/trailing connector prepositions around removed date/time spans."""
+    cleaned = " ".join(raw_name.split()).strip(" ,.-:")
+    for _ in range(2):
+        cleaned = re.sub(r"^(?:at|on|for|to|about)\s+", "", cleaned, flags=re.IGNORECASE).strip()
+        cleaned = re.sub(r"\s+(?:at|on|for|to)$", "", cleaned, flags=re.IGNORECASE).strip()
+    cleaned = re.sub(r"\b(?:rdv|appointment|rendez-vous)\b", "", cleaned, flags=re.IGNORECASE)
+    cleaned = " ".join(cleaned.split()).strip(" ,.-:")
+    return cleaned or fallback
+
+
 # ---------------------------------------------------------------------------
 # Main parser class
 # ---------------------------------------------------------------------------
@@ -72,28 +184,23 @@ class NaturalParser:
         """
         Parses rich freeform expressions including:
           Timer expressions
-          - "Ring in 15 min"
-          - "in 45m check laundry"
-          - "Check oven in 25 mins"
-          - "Timer for 30m meditation"
-          - "Remind me in 10 minutes to call John"
+          - "Ring in 15 min", "in 45m check laundry", "Check oven in 25 mins"
+          - "Timer for 30m meditation", "Remind me in half an hour to check backup"
 
-          Relative-day rendez-vous (NEW / FIXED)
-          - "Call Sam in 2 days"
-          - "Call Sam in 2 days at 3pm"
-          - "Doctor in 1 week"
-          - "Doctor in 1 week at 10am"
-          - "Dentist next Friday"
-          - "Dentist next Friday at 14:00"
-          - "Meeting on Wednesday at 3pm"
+          Relative-day rendez-vous
+          - "Call Sam in 2 days", "Call Sam in 2 days at 3pm"
+          - "Doctor in 1 week at 10am", "Call client day after tomorrow at 14h30"
 
-          Calendar / time rendez-vous
-          - "RDV at 4PM"
-          - "RDV tomorrow at 10am dentist"
-          - "Call Linda at 7:15 tomorrow morning"
-          - "at 18:30 dinner"
-          - "at 8 tonight netflix"
-          - "Dentist on 2026-11-05 at 14:00"
+          Calendar, ordinal & weekday rendez-vous
+          - "Set an alarm for Friday the 13th at 2:15 PM" (and "at2:15 PM")
+          - "Meeting on Monday the 16th at 10am", "Pay rent on the 1st at 9am"
+          - "Dentist on Nov 20th at 2:15 PM", "13th of December at 10am"
+          - "Dentist on 2026-12-05 at 14:00", "Call client on 11/20 at 3pm"
+          - "Dentist next Friday at 14:00", "Set an alarm for Friday at 2:15 PM"
+
+          Same-day / tomorrow rendez-vous
+          - "RDV at 4PM", "RDV tomorrow at 10am dentist", "at noon lunch"
+          - "Call Linda at 7:15 tomorrow morning", "at 8 tonight netflix"
 
         Returns a dict or None if unrecognized.
         """
@@ -102,6 +209,7 @@ class NaturalParser:
             return None
 
         normalized = re.sub(r"[.!]+$", "", raw).strip()
+        normalized = _normalize_natural_idioms(normalized)
 
         # ── 1. "remind me to <task> in <duration>" ──────────────────────────
         m = re.match(r"^remind\s+me\s+to\s+(.+?)\s+in\s+(\d+.+)$", normalized, re.IGNORECASE)
@@ -118,8 +226,12 @@ class NaturalParser:
             if result:
                 return result
 
-        # ── 3. "ring/alarm/timer in/for <duration> [name]" ─────────────────
-        m = re.match(r"^(?:ring|alarm|timer)\s+(?:in|for)\s+(\d+\w*.*)$", normalized, re.IGNORECASE)
+        # ── 3. "[set an] ring/alarm/timer in/for <duration> [name]" ────────
+        m = re.match(
+            r"^(?:set\s+(?:an?\s+|the\s+)?)?(?:ring|alarm|timer)\s+(?:in|for)\s+(\d+\w*.*)$",
+            normalized,
+            re.IGNORECASE,
+        )
         if m:
             result = NaturalParser._try_timer_from_in(m.group(1), "Alarm")
             if result:
@@ -132,40 +244,107 @@ class NaturalParser:
             if result:
                 return result
 
+        # ── Strip conversational prefixes for remaining RDV / timer rules ────
+        body, conv_default = _strip_conversational_prefix(normalized)
+
         # ── 5. "<task> in <N> days/weeks [at <time>]"  ─────────────────────
-        #       Also handles "<task> in <N> h/m/s" (timer) as fallback
-        rdv_days = NaturalParser._try_relative_days(normalized)
+        rdv_days = NaturalParser._try_relative_days(body, default_name=conv_default)
         if rdv_days:
             return rdv_days
 
         # ── 6. "<task> in <duration h/m/s>" ─────────────────────────────────
         m = re.match(
             r"^(.+?)\s+in\s+(\d+\s*(?:h|hr|hours?|m|min|mins|minutes?|s|sec|seconds?)(?:\s+and\s+\d+\s*(?:h|hr|hours?|m|min|mins|minutes?|s|sec|seconds?))*)$",
-            normalized, re.IGNORECASE,
+            body, re.IGNORECASE,
         )
         if m:
             secs = NaturalParser._parse_duration_seconds(m.group(2))
             if secs > 0:
-                return NaturalParser._build_timer(m.group(1).strip(), secs)
+                return NaturalParser._build_timer(_clean_task_name(m.group(1), conv_default or "Quick Timer"), secs)
 
-        # ── 7. "next <weekday> [at <time>] <task>" ──────────────────────────
-        next_wd = NaturalParser._try_next_weekday(normalized)
+        # ── 7. Explicit / ordinal calendar dates ("Friday the 13th", "Nov 20th", "the 13th", "2026-12-05") ─
+        cal_date = NaturalParser._try_calendar_date(body, default_name=conv_default or "Appointment")
+        if cal_date:
+            return cal_date
+
+        # ── 8. "[next|this|on|for] <weekday> [at <time>] <task>" ───────────
+        next_wd = NaturalParser._try_next_weekday(body, default_name=conv_default)
         if next_wd:
             return next_wd
 
-        # ── 8. RDV / rendez-vous / appointment prefix ───────────────────────
-        m = re.match(r"^(?:rdv|rendez-vous|appointment)\s+(.+)$", normalized, re.IGNORECASE)
+        # ── 9. RDV / rendez-vous / appointment prefix ───────────────────────
+        m = re.match(r"^(?:rdv|rendez-vous|appointment)\s+(.+)$", body, re.IGNORECASE)
         if m:
-            result = NaturalParser._parse_appointment_phrase(m.group(1).strip(), "RDV")
+            result = NaturalParser._parse_appointment_phrase(m.group(1).strip(), conv_default or "RDV")
             if result:
                 return result
 
-        # ── 9. General appointment phrase (today/tomorrow/at/tonight/weekday)─
-        result = NaturalParser._parse_appointment_phrase(normalized, "Meeting")
+        # ── 10. General appointment phrase (today/tomorrow/at/noon/time) ────
+        result = NaturalParser._parse_appointment_phrase(body, conv_default or "Meeting")
         if result:
             return result
 
         return None
+
+    # ── Shared time extraction helper ────────────────────────────────────────
+
+    @staticmethod
+    def _extract_time_from_text(
+        text: str, is_tonight: bool = False
+    ) -> Tuple[Optional[int], Optional[int], str]:
+        """
+        Extract an explicit time expression from *text*.
+        Supports 'at 2:15 PM', 'at2:15 PM', '@3pm', '14:30', '14h30', '9h', 'at noon', 'at midnight'.
+        Returns (hour_24, minute, remaining_text_without_time).
+        """
+        tod_m = re.search(r"\b(morning|afternoon|evening|night)\b", text, re.IGNORECASE)
+        tod = tod_m.group(1).lower() if tod_m else None
+
+        for match in _TIME_RE.finditer(text):
+            h_raw = int(match.group(1))
+            colon_min = match.group(2)
+            h_marker = match.group(3)
+            h_min = match.group(4)
+            ampm = match.group(5)
+
+            matched_slice = match.group(0).lower()
+            had_at = matched_slice.startswith("at") or matched_slice.startswith("@")
+            if not had_at:
+                prefix_ctx = text[max(0, match.start() - 5):match.start()].lower()
+                had_at = bool(re.search(r"(?:\bat\s*|@\s*)$", prefix_ctx))
+
+            has_sep = colon_min is not None or h_marker is not None
+            if colon_min is not None:
+                mi_raw = int(colon_min)
+            elif h_min is not None:
+                mi_raw = int(h_min)
+            else:
+                mi_raw = 0
+
+            # Guard: require 'at'/'@', am/pm, explicit ':'/'h' separator, tod, or tonight
+            if not ampm and not has_sep and not had_at and not tod and not is_tonight:
+                continue
+            if not ampm and not has_sep and not had_at and not tod and not is_tonight and h_raw <= 6:
+                continue
+
+            resolved = _parse_time_str(h_raw, mi_raw, ampm, tod, is_tonight)
+            if resolved is None:
+                continue
+
+            remaining = (text[:match.start()] + " " + text[match.end():]).strip()
+            if tod:
+                remaining = re.sub(rf"\b{tod}\b", " ", remaining, flags=re.IGNORECASE).strip()
+            return resolved, mi_raw, " ".join(remaining.split())
+
+        nm = re.search(r"\b(?:(?:at\s+|@\s*))?(noon|midnight)\b", text, re.IGNORECASE)
+        if nm:
+            h_out = 12 if nm.group(1).lower() == "noon" else 0
+            remaining = (text[:nm.start()] + " " + text[nm.end():]).strip()
+            if tod:
+                remaining = re.sub(rf"\b{tod}\b", " ", remaining, flags=re.IGNORECASE).strip()
+            return h_out, 0, " ".join(remaining.split())
+
+        return None, None, text
 
     # ── Duration helpers ─────────────────────────────────────────────────────
 
@@ -228,14 +407,13 @@ class NaturalParser:
     # ── Relative-day rendez-vous ─────────────────────────────────────────────
 
     @staticmethod
-    def _try_relative_days(text: str) -> Optional[Dict[str, Any]]:
+    def _try_relative_days(text: str, default_name: Optional[str] = None) -> Optional[Dict[str, Any]]:
         """
         Handle patterns like:
           "<task> in <N> days [at <time>]"
           "<task> in <N> week[s] [at <time>]"
           "in <N> days [at <time>] [<task>]"
         """
-        # Match: (optional leading task) "in N days/weeks" (optional "at time") (optional trailing task)
         pattern = re.compile(
             r"^(.*?)\bin\s+(\d+)\s+(days?|weeks?)\b(.*?)$",
             re.IGNORECASE,
@@ -244,54 +422,27 @@ class NaturalParser:
         if not m:
             return None
 
-        pre_task  = m.group(1).strip()   # text before "in N days"
-        n         = int(m.group(2))
-        unit      = m.group(3).lower()
-        post_text = m.group(4).strip()   # text after "in N days"
+        pre_task = m.group(1).strip()
+        n = int(m.group(2))
+        unit = m.group(3).lower()
+        post_text = m.group(4).strip()
 
         if unit.startswith("w"):
-            n *= 7  # convert weeks to days
+            n *= 7
 
-        # Calculate base target date
-        now       = datetime.datetime.now()
+        now = datetime.datetime.now()
         base_date = now.date() + datetime.timedelta(days=n)
 
-        # Try to extract an explicit time from the post-text (e.g. "at 3pm", "at 10:30")
-        h_out, min_out = None, None
-        if post_text:
-            tod_m = re.search(r"\b(morning|afternoon|evening|night)\b", post_text, re.IGNORECASE)
-            tod   = tod_m.group(1).lower() if tod_m else None
-
-            for tm in _TIME_RE.finditer(post_text):
-                h_raw  = int(tm.group(1))
-                mi_raw = int(tm.group(2) or 0)
-                ampm   = tm.group(3)
-                # Guard: require 'at' or ampm or tod or HH:MM for unambiguous times
-                had_at = "at" in post_text[max(0, tm.start() - 4):tm.start() + 3].lower()
-                if not ampm and tm.group(2) is None and not had_at and not tod:
-                    continue
-                resolved = _parse_time_str(h_raw, mi_raw, ampm, tod, False)
-                if resolved is not None:
-                    h_out, min_out = resolved, mi_raw
-                    break
-
-        # Default time: noon if no explicit time given
-        if h_out is None:
+        h_out, min_out, post_clean = NaturalParser._extract_time_from_text(post_text)
+        if h_out is None or min_out is None:
             h_out, min_out = 12, 0
+            post_clean = post_text
 
-        # Build task name from pre + post (minus the time part)
-        post_clean = post_text
-        if h_out is not None:
-            post_clean = _TIME_RE.sub("", post_clean)
-            post_clean = re.sub(r"\bat\b", "", post_clean, flags=re.IGNORECASE)
-            post_clean = re.sub(r"\b(morning|afternoon|evening|night)\b", "", post_clean, flags=re.IGNORECASE)
-        name_parts = " ".join(filter(None, [pre_task, post_clean.strip()]))
-        name_parts = re.sub(r"\b(rdv|appointment|rendez-vous)\b", "", name_parts, flags=re.IGNORECASE)
-        name_parts = " ".join(name_parts.split()).strip()
-        final_name = name_parts or f"In {n} day{'s' if n != 1 else ''}"
+        name_parts = " ".join(filter(None, [_clean_task_name(pre_task, ""), _clean_task_name(post_clean, "")]))
+        final_name = name_parts.strip() or default_name or f"In {n} day{'s' if n != 1 else ''}"
 
         target_dt = datetime.datetime.combine(base_date, datetime.time(h_out, min_out))
-        delta     = (target_dt - now).total_seconds()
+        delta = (target_dt - now).total_seconds()
 
         day_label = target_dt.strftime("%b %d")
         return {
@@ -302,61 +453,209 @@ class NaturalParser:
             "display_str": f"Rendez-vous: '{final_name}' on {day_label} at {h_out:02d}:{min_out:02d}",
         }
 
-    # ── Next-weekday handler ─────────────────────────────────────────────────
+    # ── Explicit & ordinal calendar dates ────────────────────────────────────
 
     @staticmethod
-    def _try_next_weekday(text: str) -> Optional[Dict[str, Any]]:
+    def _try_calendar_date(text: str, default_name: str = "Appointment") -> Optional[Dict[str, Any]]:
+        """
+        Handle calendar date expressions:
+          - Weekday + ordinal day: "Friday the 13th at 2:15 PM", "Monday the 16th at 10am"
+          - ISO date: "2026-12-05 at 14:00", "2026/12/05"
+          - Month + day: "Nov 20th at 2:15 PM", "13th of December at 10am", "December 25 at 9am"
+          - Numeric slash date: "11/20 at 3pm", "12/05/2026"
+          - Ordinal day alone: "on the 13th at 2:15 PM", "on the 1st at 9am"
+        """
+        now = datetime.datetime.now()
+        is_tonight = bool(re.search(r"\btonight\b", text, re.IGNORECASE))
+
+        def _finish(target_date: datetime.date, h_val: int, mi_val: int, rem_text: str) -> Dict[str, Any]:
+            cleaned_rem = re.sub(r"\b(?:today|tonight)\b", " ", rem_text, flags=re.IGNORECASE)
+            final_name = _clean_task_name(cleaned_rem, default_name)
+            target_dt = datetime.datetime.combine(target_date, datetime.time(h_val, mi_val))
+            delta = (target_dt - now).total_seconds()
+            date_fmt = "%a, %b %d, %Y" if target_dt.year != now.year else "%a, %b %d"
+            day_label = target_dt.strftime(date_fmt)
+            return {
+                "kind": "rendez-vous",
+                "name": final_name,
+                "seconds_from_now": max(0.0, delta),
+                "target_dt": target_dt,
+                "display_str": f"Rendez-vous: '{final_name}' on {day_label} at {h_val:02d}:{mi_val:02d}",
+            }
+
+        # Case A: "<weekday> [the] <N>th" (e.g., "Friday the 13th", "Friday 13th")
+        wd_ord_re = re.compile(
+            rf"\b(?:(?:on|for)\s+)?({_WEEKDAY_PATTERN})\s+"
+            rf"(?:the\s+(\d{{1,2}})(?:st|nd|rd|th)?|(\d{{1,2}})(?:st|nd|rd|th))"
+            rf"\b(?!\s*(?::|am\b|pm\b))",
+            re.IGNORECASE,
+        )
+        m = wd_ord_re.search(text)
+        if m:
+            weekday = _WEEKDAY_MAP[m.group(1).lower()]
+            day_num = int(m.group(2) or m.group(3))
+            rem = (text[:m.start()] + " " + text[m.end():]).strip()
+            h_out, min_out, rem = NaturalParser._extract_time_from_text(rem, is_tonight)
+            if h_out is None or min_out is None:
+                h_out, min_out = 12, 0
+            target_date = _next_weekday_and_day(now, weekday, day_num, h_out, min_out)
+            if target_date is not None:
+                return _finish(target_date, h_out, min_out, rem)
+            return None
+
+        # Case B: ISO date YYYY-MM-DD or YYYY/MM/DD
+        iso_re = re.compile(r"\b(?:(?:on|for)\s+)?(20\d{2})[-/](\d{1,2})[-/](\d{1,2})\b", re.IGNORECASE)
+        m = iso_re.search(text)
+        if m:
+            year, month, day_num = int(m.group(1)), int(m.group(2)), int(m.group(3))
+            try:
+                target_date = datetime.date(year, month, day_num)
+            except ValueError:
+                return None
+            rem = (text[:m.start()] + " " + text[m.end():]).strip()
+            h_out, min_out, rem = NaturalParser._extract_time_from_text(rem, is_tonight)
+            if h_out is None or min_out is None:
+                h_out, min_out = 12, 0
+            return _finish(target_date, h_out, min_out, rem)
+
+        # Case C1: "<Month> [the] <N>[th][, YYYY]"
+        mon_day_re = re.compile(
+            rf"\b(?:(?:on|for)\s+)?({_MONTH_PATTERN})\.?\s+(?:the\s+)?(\d{{1,2}})(?:st|nd|rd|th)?(?:\s*,?\s*(20\d{{2}}))?\b",
+            re.IGNORECASE,
+        )
+        m = mon_day_re.search(text)
+        if m:
+            month = _MONTH_MAP[m.group(1).lower()]
+            day_num = int(m.group(2))
+            explicit_year = int(m.group(3)) if m.group(3) else None
+            rem = (text[:m.start()] + " " + text[m.end():]).strip()
+            h_out, min_out, rem = NaturalParser._extract_time_from_text(rem, is_tonight)
+            if h_out is None or min_out is None:
+                h_out, min_out = 12, 0
+            target_date = NaturalParser._resolve_month_day(now, month, day_num, h_out, min_out, explicit_year)
+            if target_date is not None:
+                return _finish(target_date, h_out, min_out, rem)
+            return None
+
+        # Case C2: "[the] <N>[th] [of] <Month>[, YYYY]"
+        day_mon_re = re.compile(
+            rf"\b(?:(?:on|for)\s+)?(?:the\s+)?(\d{{1,2}})(?:st|nd|rd|th)?(?:\s+of)?\s+({_MONTH_PATTERN})\b(?:\s*,?\s*(20\d{{2}}))?",
+            re.IGNORECASE,
+        )
+        m = day_mon_re.search(text)
+        if m:
+            day_num = int(m.group(1))
+            month = _MONTH_MAP[m.group(2).lower()]
+            explicit_year = int(m.group(3)) if m.group(3) else None
+            rem = (text[:m.start()] + " " + text[m.end():]).strip()
+            h_out, min_out, rem = NaturalParser._extract_time_from_text(rem, is_tonight)
+            if h_out is None or min_out is None:
+                h_out, min_out = 12, 0
+            target_date = NaturalParser._resolve_month_day(now, month, day_num, h_out, min_out, explicit_year)
+            if target_date is not None:
+                return _finish(target_date, h_out, min_out, rem)
+            return None
+
+        # Case D: Numeric slash date "MM/DD" or "MM/DD/YYYY"
+        slash_re = re.compile(r"\b(?:(?:on|for)\s+)?(\d{1,2})/(\d{1,2})(?:/(20\d{2}))?\b", re.IGNORECASE)
+        m = slash_re.search(text)
+        if m:
+            month, day_num = int(m.group(1)), int(m.group(2))
+            explicit_year = int(m.group(3)) if m.group(3) else None
+            rem = (text[:m.start()] + " " + text[m.end():]).strip()
+            h_out, min_out, rem = NaturalParser._extract_time_from_text(rem, is_tonight)
+            if h_out is None or min_out is None:
+                h_out, min_out = 12, 0
+            target_date = NaturalParser._resolve_month_day(now, month, day_num, h_out, min_out, explicit_year)
+            if target_date is not None:
+                return _finish(target_date, h_out, min_out, rem)
+            return None
+
+        # Case E: Ordinal day of month alone ("on the 13th", "for the 1st", "the 13th")
+        ord_re = re.compile(
+            r"\b(?:(?:on|for)\s+(?:the\s+)?|the\s+)(\d{1,2})(?:st|nd|rd|th)\b",
+            re.IGNORECASE,
+        )
+        m = ord_re.search(text)
+        if m:
+            day_num = int(m.group(1))
+            rem = (text[:m.start()] + " " + text[m.end():]).strip()
+            h_out, min_out, rem = NaturalParser._extract_time_from_text(rem, is_tonight)
+            if h_out is None or min_out is None:
+                h_out, min_out = 12, 0
+            target_date = _next_day_of_month(now, day_num, h_out, min_out)
+            if target_date is not None:
+                return _finish(target_date, h_out, min_out, rem)
+            return None
+
+        return None
+
+    @staticmethod
+    def _resolve_month_day(
+        now: datetime.datetime,
+        month: int,
+        day_num: int,
+        hour: int,
+        minute: int,
+        explicit_year: Optional[int],
+    ) -> Optional[datetime.date]:
+        if explicit_year is not None:
+            try:
+                return datetime.date(explicit_year, month, day_num)
+            except ValueError:
+                return None
+
+        for offset in range(5):
+            year = now.year + offset
+            try:
+                cand = datetime.date(year, month, day_num)
+            except ValueError:
+                continue  # handles Feb 29 waiting for next leap year
+            cand_dt = datetime.datetime.combine(cand, datetime.time(hour, minute))
+            if cand_dt > now:
+                return cand
+        return None
+
+    # ── Next/this/bare weekday handler ───────────────────────────────────────
+
+    @staticmethod
+    def _try_next_weekday(text: str, default_name: Optional[str] = None) -> Optional[Dict[str, Any]]:
         """
         Handle: "next <weekday> [at <time>] [<task>]"
-                "<task> next <weekday> [at <time>]"
+                "this <weekday> at <time> [<task>]"
                 "<task> on <weekday> at <time>"
-                "on <weekday> at <time> <task>"
+                "Set an alarm for Friday at 2:15 PM"
         """
-        wd_pattern = "|".join(_WEEKDAY_MAP.keys())
-        # "next <weekday>" pattern
-        m = re.search(
-            rf"\b(?:next|on)\s+({wd_pattern})\b",
-            text, re.IGNORECASE,
-        )
+        m = re.search(rf"\b(?:(next|this|on|for)\s+)?({_WEEKDAY_PATTERN})\b", text, re.IGNORECASE)
         if not m:
             return None
 
-        wd_str   = m.group(1).lower()
-        weekday  = _WEEKDAY_MAP[wd_str]
-        now      = datetime.datetime.now()
-        base_date = _next_weekday(now.date(), weekday)
+        modifier = m.group(1).lower() if m.group(1) else None
+        wd_str = m.group(2).lower()
+        weekday = _WEEKDAY_MAP[wd_str]
+        now = datetime.datetime.now()
 
-        # Strip the "next/on <weekday>" part and look for time + task in remaining
         remaining = (text[:m.start()] + " " + text[m.end():]).strip()
+        h_out, min_out, remaining = NaturalParser._extract_time_from_text(remaining)
 
-        # Detect time-of-day modifier
-        tod_m = re.search(r"\b(morning|afternoon|evening|night)\b", remaining, re.IGNORECASE)
-        tod   = tod_m.group(1).lower() if tod_m else None
+        # Guard: a bare weekday (without next/this/on/for) requires an explicit time
+        if modifier is None and h_out is None:
+            return None
 
-        h_out, min_out = 12, 0  # default noon
-        for tm in _TIME_RE.finditer(remaining):
-            h_raw  = int(tm.group(1))
-            mi_raw = int(tm.group(2) or 0)
-            ampm   = tm.group(3)
-            had_at = "at" in remaining[max(0, tm.start() - 4):tm.start() + 3].lower()
-            if not ampm and tm.group(2) is None and not had_at and not tod:
-                continue
-            resolved = _parse_time_str(h_raw, mi_raw, ampm, tod, False)
-            if resolved is not None:
-                h_out, min_out = resolved, mi_raw
-                # Remove matched time from remaining
-                remaining = (remaining[:tm.start()] + " " + remaining[tm.end():]).strip()
-                break
+        if h_out is None or min_out is None:
+            h_out, min_out = 12, 0
 
-        # Clean remaining into task name
-        if tod:
-            remaining = re.sub(rf"\b{tod}\b", "", remaining, flags=re.IGNORECASE)
-        remaining = re.sub(r"\bat\b", "", remaining, flags=re.IGNORECASE)
-        remaining = re.sub(r"\b(rdv|appointment|rendez-vous)\b", "", remaining, flags=re.IGNORECASE)
-        final_name = " ".join(remaining.split()).strip() or f"{wd_str.capitalize()} meeting"
+        if modifier != "next" and weekday == now.date().weekday():
+            today_dt = datetime.datetime.combine(now.date(), datetime.time(h_out, min_out))
+            base_date = now.date() if today_dt > now else _next_weekday(now.date(), weekday)
+        else:
+            base_date = _next_weekday(now.date(), weekday)
+
+        fallback_label = default_name or f"{wd_str.capitalize()} meeting"
+        final_name = _clean_task_name(remaining, fallback_label)
 
         target_dt = datetime.datetime.combine(base_date, datetime.time(h_out, min_out))
-        delta     = (target_dt - now).total_seconds()
+        delta = (target_dt - now).total_seconds()
         day_label = target_dt.strftime("%A %b %d")
 
         return {
@@ -377,67 +676,42 @@ class NaturalParser:
           - "RDV at 4PM"
           - "at 18:30 dinner"
           - "tomorrow 3pm dentist"
-          - "at 8 tonight party"
-          - "team sync tomorrow at 10:30am"
+          - "at 8 tonight netflix"
+          - "Dinner at 19h30", "at noon lunch"
         """
         text = phrase.strip()
 
         is_tomorrow = bool(re.search(r"\btomorrow\b", text, re.IGNORECASE))
-        is_tonight  = bool(re.search(r"\btonight\b",  text, re.IGNORECASE))
-
-        tod_m = re.search(r"\b(morning|afternoon|evening|night)\b", text, re.IGNORECASE)
-        tod   = tod_m.group(1).lower() if tod_m else None
+        is_tonight = bool(re.search(r"\btonight\b", text, re.IGNORECASE))
 
         clean = re.sub(r"\b(tomorrow|today|tonight)\b", " ", text, flags=re.IGNORECASE)
-        if tod:
-            clean = re.sub(rf"\b{tod}\b", " ", clean, flags=re.IGNORECASE)
+        h_out, mi_raw, name_part = NaturalParser._extract_time_from_text(clean, is_tonight=is_tonight)
+        if h_out is None or mi_raw is None:
+            return None
 
-        for match in _TIME_RE.finditer(clean):
-            h_raw  = int(match.group(1))
-            mi_raw = int(match.group(2) or 0)
-            ampm   = match.group(3)
+        final_name = _clean_task_name(name_part, default_name)
 
-            had_at = "at" in clean[max(0, match.start() - 4):match.start() + 3].lower()
-            # Strict guard: require 'at', ampm, tod, minutes, or tonight to accept time
-            if not ampm and match.group(2) is None and not had_at and not tod and not is_tonight:
-                continue
-            # Extra guard: bare single digit with no context is likely not a time
-            if not ampm and not had_at and not tod and not is_tonight and h_raw <= 6:
-                continue
+        now = datetime.datetime.now()
+        target_date = now.date()
 
-            resolved = _parse_time_str(h_raw, mi_raw, ampm, tod, is_tonight)
-            if resolved is None:
-                continue
-            h_out = resolved
-
-            name_part = (clean[:match.start()] + " " + clean[match.end():]).strip()
-            name_part = re.sub(r"\b(?:at|on|for|with)\b", " ", name_part, flags=re.IGNORECASE)
-            name_part = " ".join(name_part.split()).strip()
-            final_name = name_part or default_name
-
-            now         = datetime.datetime.now()
-            target_date = now.date()
-
-            if is_tomorrow:
+        if is_tomorrow:
+            target_date += datetime.timedelta(days=1)
+        else:
+            cand_dt = datetime.datetime.combine(target_date, datetime.time(h_out, mi_raw))
+            if cand_dt <= now and (not is_tonight or h_out == 0):
                 target_date += datetime.timedelta(days=1)
-            else:
-                cand_dt = datetime.datetime.combine(target_date, datetime.time(h_out, mi_raw))
-                if cand_dt <= now and not is_tonight:
-                    target_date += datetime.timedelta(days=1)
 
-            target_dt = datetime.datetime.combine(target_date, datetime.time(h_out, mi_raw))
-            delta     = (target_dt - now).total_seconds()
-            day_str   = "Tomorrow" if target_dt.date() == (now.date() + datetime.timedelta(days=1)) else "Today"
+        target_dt = datetime.datetime.combine(target_date, datetime.time(h_out, mi_raw))
+        delta = (target_dt - now).total_seconds()
+        day_str = "Tomorrow" if target_dt.date() == (now.date() + datetime.timedelta(days=1)) else "Today"
 
-            return {
-                "kind": "rendez-vous",
-                "name": final_name,
-                "seconds_from_now": max(0.0, delta),
-                "target_dt": target_dt,
-                "display_str": f"Rendez-vous: '{final_name}' on {day_str} at {h_out:02d}:{mi_raw:02d}",
-            }
-
-        return None
+        return {
+            "kind": "rendez-vous",
+            "name": final_name,
+            "seconds_from_now": max(0.0, delta),
+            "target_dt": target_dt,
+            "display_str": f"Rendez-vous: '{final_name}' on {day_str} at {h_out:02d}:{mi_raw:02d}",
+        }
 
     # ── Shared builder ───────────────────────────────────────────────────────
 

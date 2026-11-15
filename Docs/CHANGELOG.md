@@ -5,6 +5,27 @@
 
 ---
 
+## [v3.15] — Expanded RDV Early Alert Lead-Time Options (2026-11-15)
+- **Additional RDV Early Alert Presets (`src/config.py`, `src/__init__.py`, `src/scheduler.py`, `src/gui.py`)**:
+  - Added `RDV_LEAD_OPTIONS` in `src/config.py` (re-exported in `src/__init__.py`) adding `45m before` (`45`), `1 hour before` (`60`), `2 hours before` (`120`), and `1 day before` (`1440`) alongside `0m`/`5m`/`10m`/`15m`.
+  - Added `_format_early_badge()` and `_apply_early_badge()` in `src/scheduler.py` so early alert prefixes display concise units (`[45m Early]`, `[1h Early]`, `[2h Early]`, `[1d Early]`), and updated regex prefix stripping in both `src/scheduler.py` and `src/gui.py`.
+  - Updated `self.combo_rdv_lead` population, `_begin_edit_rdv` index lookup via `findData()`, `_add_rdv` value retrieval via `currentData()`, and Activity RDV lead label formatting in `src/gui.py`.
+
+---
+
+## [v3.14] — Expanded Natural Language Recognition & Windows Boot Startup Reliability (2026-11-15)
+- **Expanded Natural Language Scheduling (`src/natural_parser.py`, `src/gui.py`)**:
+  - Added conversational prefix stripping (`Set an alarm for/at...`, `Set a reminder to...`, `Remind me...`, `Schedule a meeting for...`, `Wake me up...`) with inferred fallback task labels (`Alarm`, `Reminder`, `Meeting`, `Wake Up Alarm`).
+  - Added `_try_calendar_date()` supporting **Weekday + Ordinal Day** (`"Friday the 13th"`, `"Monday the 16th"`, resolved to the next upcoming matching calendar date), **Ordinal Day Alone** (`"on the 13th"`, `"on the 1st"`), **Month + Day** in both orders (`"Nov 20th"`, `"13th of December"`, `"December 25"`), **ISO Dates** (`"2026-12-05"`), and **Numeric Slash Dates** (`"11/20"`, `"12/05/2026"`).
+  - Upgraded time extraction (`_extract_time_from_text`) to accept missing spaces after `at` (`"at2:15 PM"`), `@` time prefixes, `14h30` / `9h` hour notation, and `"at noon"` / `"at midnight"`, plus natural idioms (`"in an hour"`, `"in half an hour"`, `"day after tomorrow"`).
+  - Expanded `_try_next_weekday()` to support `"this <weekday>"` and bare weekdays paired with an explicit time (e.g., `"Set an alarm for Friday at 2:15 PM"`).
+  - Updated Hero Deck `smart_entry` placeholder, tip label, and error hint in `src/gui.py`.
+- **Windows Boot Auto-Start Reliability (`run.py`, `src/startup.py`)**:
+  - Updated `run.py` to normalize `os.chdir(PROJECT_DIR)` at boot and enforce a Win32 single-instance mutex (`Local\TimeSpace_SingleInstance_Mutex`) so duplicate startup triggers exit silently.
+  - Upgraded `src/startup.py` to configure both `HKCU\Software\Microsoft\Windows\CurrentVersion\Run` (`TimeSpace` + `StartupApproved\Run` enabled flag) and a windowless Startup folder launcher (`%APPDATA%\Microsoft\Windows\Start Menu\Programs\Startup\TimeSpace.vbs`).
+
+---
+
 ## [v3.13] — Active Reminders Queue Ring Date, Day of Week & Time Display (2026-11-15)
 - **Active Reminders Queue Ring Timestamp (`src/gui.py`)**:
   - Updated `TimerRendezVousWidget._fmt_target(item, now)` to format the target ring time with abbreviated day of the week, calendar date, and clock time (`%a, %b %d • %H:%M:%S`) while projecting `now + remaining_paused` for paused items.
