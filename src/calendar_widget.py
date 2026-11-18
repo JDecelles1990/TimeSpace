@@ -115,19 +115,32 @@ class MiniCalendar(QWidget):
                 has_event = day_date in self.event_dates
 
                 if is_selected:
-                    bg_color = COLORS["accent"]
-                    fg_color = "#ffffff"
+                    bg_qss = (
+                        f"qlineargradient(x1:0, y1:0, x2:1, y2:1, "
+                        f"stop:0 {COLORS['glow_cyan']}, stop:1 {COLORS['glow_green']})"
+                    )
+                    border_qss = COLORS["glow_specular"]
+                    fg_color = "#090a12"
                     weight = "bold"
                 elif is_today:
-                    bg_color = COLORS["surface_light"]
-                    fg_color = COLORS["accent_warning"]
+                    bg_qss = (
+                        f"qlineargradient(x1:0, y1:0, x2:0, y2:1, "
+                        f"stop:0 #2a2848, stop:1 {COLORS['surface']})"
+                    )
+                    border_qss = COLORS["glow_gold"]
+                    fg_color = COLORS["glow_gold"]
                     weight = "bold"
                 elif not is_current_month:
-                    bg_color = COLORS["bg_dark"]
-                    fg_color = "#52525b"
+                    bg_qss = COLORS["bg_dark"]
+                    border_qss = "#1b1e34"
+                    fg_color = "#52587a"
                     weight = "normal"
                 else:
-                    bg_color = COLORS["surface"]
+                    bg_qss = (
+                        f"qlineargradient(x1:0, y1:0, x2:0, y2:1, "
+                        f"stop:0 #23284a, stop:1 {COLORS['surface']})"
+                    )
+                    border_qss = COLORS["border"]
                     fg_color = COLORS["text"]
                     weight = "normal"
 
@@ -139,9 +152,14 @@ class MiniCalendar(QWidget):
                 btn.setCursor(Qt.CursorShape.PointingHandCursor)
                 btn.setFixedHeight(20)
                 btn.setStyleSheet(
-                    f"QPushButton {{ background-color: {bg_color}; color: {fg_color}; "
-                    f"font-weight: {weight}; font-size: 11px; padding: 1px; border-radius: 3px; }}"
-                    f"QPushButton:hover {{ background-color: {COLORS['accent_hover']}; color: #ffffff; }}"
+                    f"QPushButton {{ background-color: {bg_qss}; color: {fg_color}; "
+                    f"border: 1px solid {border_qss}; font-weight: {weight}; font-size: 11px; "
+                    f"padding: 1px; border-radius: 3px; }}"
+                    f"QPushButton:hover {{ background-color: qlineargradient(x1:0, y1:0, x2:1, y2:1, "
+                    f"stop:0 {COLORS['glow_violet']}, stop:1 {COLORS['glow_cyan']}); "
+                    f"border: 1px solid {COLORS['glow_specular']}; color: #ffffff; }}"
+                    f"QPushButton:pressed {{ background-color: qlineargradient(x1:0, y1:0, x2:1, y2:1, "
+                    f"stop:0 {COLORS['glow_cyan']}, stop:1 {COLORS['glow_green']}); color: #090a12; }}"
                 )
                 btn.clicked.connect(lambda _checked=False, d=day_date: self._on_day_clicked(d))
                 self.grid_layout.addWidget(btn, row_idx, col_idx)

@@ -63,9 +63,12 @@ class FloatingMiniHUD(QWidget):
         self.btn_pause.setFixedSize(22, 22)
         self.btn_pause.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_pause.setStyleSheet(
-            f"QPushButton {{ background-color: {COLORS['surface_light']}; color: {COLORS['text']}; "
-            f"border: none; border-radius: 3px; padding: 0px; }}"
-            f"QPushButton:hover {{ background-color: {COLORS['accent']}; color: #ffffff; }}"
+            f"QPushButton {{ background-color: qlineargradient(x1:0, y1:0, x2:0, y2:1, "
+            f"stop:0 #2b3158, stop:1 {COLORS['surface']}); color: {COLORS['text']}; "
+            f"border: 1px solid {COLORS['border']}; border-radius: 3px; padding: 0px; }}"
+            f"QPushButton:hover {{ background-color: qlineargradient(x1:0, y1:0, x2:1, y2:1, "
+            f"stop:0 {COLORS['glow_violet']}, stop:1 {COLORS['glow_cyan']}); color: #ffffff; "
+            f"border: 1px solid {COLORS['glow_specular']}; }}"
         )
         self.btn_pause.clicked.connect(self._handle_pause)
         row.addWidget(self.btn_pause)
@@ -76,7 +79,8 @@ class FloatingMiniHUD(QWidget):
         btn_close.setStyleSheet(
             f"QPushButton {{ background-color: transparent; color: {COLORS['text_muted']}; "
             f"border: none; border-radius: 3px; padding: 0px; }}"
-            f"QPushButton:hover {{ background-color: {COLORS['accent_danger']}; color: #ffffff; }}"
+            f"QPushButton:hover {{ background-color: qlineargradient(x1:0, y1:0, x2:1, y2:1, "
+            f"stop:0 {COLORS['glow_magenta']}, stop:1 #fb7185); color: #ffffff; }}"
         )
         btn_close.clicked.connect(self.close_hud)
         row.addWidget(btn_close)
@@ -85,7 +89,9 @@ class FloatingMiniHUD(QWidget):
 
     def _set_border_color(self, color: str) -> None:
         self.card.setStyleSheet(
-            f"QFrame {{ background-color: {COLORS['bg_dark']}; border: 1.5px solid {color}; border-radius: 5px; }}"
+            f"QFrame {{ background-color: qlineargradient(x1:0, y1:0, x2:1, y2:1, "
+            f"stop:0 #181b30, stop:1 {COLORS['bg_dark']}); "
+            f"border: 1.5px solid {color}; border-radius: 6px; }}"
         )
 
     def mousePressEvent(self, event) -> None:

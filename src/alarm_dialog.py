@@ -103,8 +103,9 @@ class AlarmDialog(QDialog):
 
         card = QFrame(self)
         card.setStyleSheet(
-            f"QFrame {{ background-color: {COLORS['bg_dark']}; "
-            f"border: 1.5px solid {accent_border}; border-radius: 6px; }}"
+            f"QFrame {{ background-color: qlineargradient(x1:0, y1:0, x2:1, y2:1, "
+            f"stop:0 #181b30, stop:1 {COLORS['bg_dark']}); "
+            f"border: 1.5px solid {accent_border}; border-radius: 7px; }}"
         )
         card_layout = QVBoxLayout(card)
         card_layout.setContentsMargins(10, 8, 10, 8)
@@ -172,9 +173,11 @@ class AlarmDialog(QDialog):
         btn_dismiss = QPushButton("✓ Dismiss")
         btn_dismiss.setCursor(Qt.CursorShape.PointingHandCursor)
         btn_dismiss.setStyleSheet(
-            f"QPushButton {{ background-color: {COLORS['accent_danger']}; color: #ffffff; "
-            f"font-weight: bold; padding: 4px 10px; border-radius: 4px; border: none; }}"
-            f"QPushButton:hover {{ background-color: #dc2626; }}"
+            f"QPushButton {{ background-color: qlineargradient(x1:0, y1:0, x2:1, y2:1, "
+            f"stop:0 #fb7185, stop:1 {COLORS['glow_magenta']}); color: #ffffff; "
+            f"font-weight: bold; padding: 4px 10px; border-radius: 4px; border: 1px solid #fecdd3; }}"
+            f"QPushButton:hover {{ background-color: qlineargradient(x1:0, y1:0, x2:1, y2:1, "
+            f"stop:0 #fda4af, stop:1 #f43f5e); }}"
         )
         btn_dismiss.clicked.connect(self._handle_dismiss)
         action_row.addWidget(btn_dismiss)
@@ -184,9 +187,11 @@ class AlarmDialog(QDialog):
             btn_open.setCursor(Qt.CursorShape.PointingHandCursor)
             btn_open.setToolTip(normalize_link_target(self.url))
             btn_open.setStyleSheet(
-                f"QPushButton {{ background-color: {COLORS['accent_success']}; color: #ffffff; "
-                f"font-weight: bold; padding: 4px 10px; border-radius: 4px; border: none; }}"
-                f"QPushButton:hover {{ background-color: #059669; }}"
+                f"QPushButton {{ background-color: qlineargradient(x1:0, y1:0, x2:1, y2:1, "
+                f"stop:0 {COLORS['glow_green']}, stop:1 {COLORS['accent_success']}); color: #090a12; "
+                f"font-weight: bold; padding: 4px 10px; border-radius: 4px; border: 1px solid {COLORS['glow_specular']}; }}"
+                f"QPushButton:hover {{ background-color: qlineargradient(x1:0, y1:0, x2:1, y2:1, "
+                f"stop:0 {COLORS['glow_cyan']}, stop:1 {COLORS['glow_green']}); }}"
             )
             btn_open.clicked.connect(self._handle_open_link)
             action_row.addWidget(btn_open)
@@ -205,9 +210,11 @@ class AlarmDialog(QDialog):
         btn_snooze = QPushButton("💤 Snooze")
         btn_snooze.setCursor(Qt.CursorShape.PointingHandCursor)
         btn_snooze.setStyleSheet(
-            f"QPushButton {{ background-color: {COLORS['accent']}; color: #ffffff; "
-            f"font-weight: bold; padding: 4px 9px; border-radius: 4px; border: none; }}"
-            f"QPushButton:hover {{ background-color: {COLORS['accent_hover']}; }}"
+            f"QPushButton {{ background-color: qlineargradient(x1:0, y1:0, x2:1, y2:1, "
+            f"stop:0 {COLORS['glow_violet']}, stop:1 {COLORS['accent']}); color: #ffffff; "
+            f"font-weight: bold; padding: 4px 9px; border-radius: 4px; border: 1px solid {COLORS['glow_violet_light']}; }}"
+            f"QPushButton:hover {{ background-color: qlineargradient(x1:0, y1:0, x2:1, y2:1, "
+            f"stop:0 {COLORS['glow_cyan']}, stop:1 {COLORS['glow_violet']}); color: #ffffff; }}"
         )
         btn_snooze.clicked.connect(self._handle_snooze)
         action_row.addWidget(btn_snooze)

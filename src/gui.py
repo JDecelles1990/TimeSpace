@@ -6,7 +6,7 @@ import time
 import datetime
 from typing import Optional, List, Tuple, Callable
 
-from PySide6.QtCore import Qt, QTimer, Signal, QObject, QUrl, QPoint, QEvent
+from PySide6.QtCore import Qt, QTimer, Signal, QObject, QUrl, QPoint, QEvent, QVariantAnimation, QEasingCurve
 from PySide6.QtGui import (
     QKeySequence,
     QShortcut,
@@ -15,6 +15,8 @@ from PySide6.QtGui import (
     QDesktopServices,
     QFont,
     QIcon,
+    QPainter,
+    QLinearGradient,
     QPixmap,
     QSyntaxHighlighter,
     QTextCharFormat,
@@ -49,6 +51,7 @@ from PySide6.QtWidgets import (
     QSplitter,
     QStackedWidget,
     QSizePolicy,
+    QDialog,
     QGraphicsDropShadowEffect,
 )
 
@@ -94,35 +97,227 @@ _URL_TOKEN_RE = re.compile(r"(?:https?://|www\.)[^\s<>\"']+", re.IGNORECASE)
 
 
 class ButtonGlowFilter(QObject):
-    """Adds a violet (hover) / cyan-green (pressed) neon glow to QPushButtons."""
+    """Animates role-matched neon hover, keyboard/input focus, and click halos on interactive controls."""
+
+    _INTERACTIVE_TYPES = (QPushButton, QLineEdit, QSpinBox, QComboBox, QSlider, QCheckBox)
+    _KEYBOARD_FOCUS_REASONS = (
+        Qt.FocusReason.TabFocusReason,
+        Qt.FocusReason.BacktabFocusReason,
+        Qt.FocusReason.ShortcutFocusReason,
+    )
 
     def __init__(self, root: QWidget) -> None:
         super().__init__(root)
         self._root = root
+        self._alive = True
+        root.destroyed.connect(self._mark_dead)
+
+    def _mark_dead(self) -> None:
+        self._alive = False
 
     @staticmethod
-    def _apply(btn: QPushButton, color: str, blur: int) -> None:
-        eff = QGraphicsDropShadowEffect(btn)
-        eff.setOffset(0, 0)
-        eff.setBlurRadius(blur)
-        eff.setColor(QColor(color))
-        btn.setGraphicsEffect(eff)
+    def _target_style(widget: QWidget, active_mode: str) -> Tuple[str, float]:
+        if isinstance(widget, QPushButton):
+            obj = widget.objectName()
+            txt = widget.text()
+            if obj == "successBtn":
+                return (
+                    COLORS["glow_specular"] if active_mode == "press" else COLORS["glow_green"],
+                    34.0 if active_mode == "press" else 22.0,
+                )
+            if obj == "dangerBtn":
+                return (
+                    "#fb7185" if active_mode == "press" else COLORS["glow_magenta"],
+                    34.0 if active_mode == "press" else 22.0,
+                )
+            if obj == "primaryBtn":
+                return (
+                    COLORS["glow_green"] if active_mode == "press" else COLORS["glow_cyan"],
+                    34.0 if active_mode == "press" else 24.0,
+                )
+            if "Admin" in txt:
+                return (
+                    "#fde047" if active_mode == "press" else COLORS["glow_gold"],
+                    34.0 if active_mode == "press" else 22.0,
+                )
+            return (
+                COLORS["glow_cyan"] if active_mode == "press" else (
+                    COLORS["glow_cyan"] if active_mode == "focus" else COLORS["glow_violet"]
+                ),
+                34.0 if active_mode == "press" else 22.0,
+            )
+        if isinstance(widget, QCheckBox):
+            return COLORS["glow_cyan"], 16.0
+        if active_mode in ("focus", "press"):
+            return COLORS["glow_cyan"], 22.0
+        return COLORS["glow_violet"], 15.0
+
+    @staticmethod
+    def _animate_glow(widget: QWidget, color_hex: Optional[str], target_blur: float, duration_ms: int = 150) -> None:
+        eff = widget.graphicsEffect()
+        if not isinstance(eff, QGraphicsDropShadowEffect):
+            if target_blur <= 0.0:
+                return
+            eff = QGraphicsDropShadowEffect(widget)
+            eff.setOffset(0, 0)
+            eff.setBlurRadius(0.0)
+            widget.setGraphicsEffect(eff)
+
+        if color_hex:
+            eff.setColor(QColor(color_hex))
+
+        setattr(widget, "_glow_target", float(target_blur))
+        anim: Optional[QVariantAnimation] = getattr(widget, "_glow_anim", None)
+        if anim is None:
+            anim = QVariantAnimation(widget)
+            anim.setEasingCurve(QEasingCurve.Type.OutCubic)
+
+            def _on_val(val, w=widget) -> None:
+                cur_eff = w.graphicsEffect()
+                if isinstance(cur_eff, QGraphicsDropShadowEffect):
+                    cur_eff.setBlurRadius(float(val))
+
+            def _on_done(w=widget) -> None:
+                if getattr(w, "_glow_target", 0.0) <= 0.0 and not (
+                    getattr(w, "_glow_hover", False)
+                    or getattr(w, "_glow_focus", False)
+                    or getattr(w, "_glow_press", False)
+                ):
+                    w.setGraphicsEffect(None)
+
+            anim.valueChanged.connect(_on_val)
+            anim.finished.connect(_on_done)
+            setattr(widget, "_glow_anim", anim)
+
+        start_blur = float(eff.blurRadius())
+        if abs(start_blur - target_blur) < 0.5:
+            eff.setBlurRadius(float(target_blur))
+            if target_blur <= 0.0:
+                widget.setGraphicsEffect(None)
+            return
+
+        anim.stop()
+        anim.setDuration(duration_ms)
+        anim.setStartValue(start_blur)
+        anim.setEndValue(float(target_blur))
+        anim.start()
+
+    def _sync_widget_glow(self, widget: QWidget) -> None:
+        is_hover = bool(getattr(widget, "_glow_hover", False))
+        is_focus = bool(getattr(widget, "_glow_focus", False))
+        is_press = bool(getattr(widget, "_glow_press", False))
+
+        if not widget.isEnabled() or not (is_hover or is_focus or is_press):
+            self._animate_glow(widget, None, 0.0, duration_ms=170)
+            return
+
+        if is_press:
+            color_hex, blur = self._target_style(widget, "press")
+            self._animate_glow(widget, color_hex, blur, duration_ms=85)
+        elif is_focus:
+            color_hex, blur = self._target_style(widget, "focus")
+            self._animate_glow(widget, color_hex, blur, duration_ms=140)
+        else:
+            color_hex, blur = self._target_style(widget, "hover")
+            self._animate_glow(widget, color_hex, blur, duration_ms=150)
 
     def eventFilter(self, watched: QObject, event: QEvent) -> bool:
-        if isinstance(watched, QPushButton) and self._root.isAncestorOf(watched):
-            et = event.type()
-            if et in (QEvent.Type.Enter, QEvent.Type.HoverEnter) and watched.isEnabled():
-                self._apply(watched, COLORS["glow_violet"], 22)
-            elif et == QEvent.Type.MouseButtonPress and watched.isEnabled():
-                self._apply(watched, COLORS["glow_cyan"], 30)
-            elif et == QEvent.Type.MouseButtonRelease:
-                if watched.underMouse():
-                    self._apply(watched, COLORS["glow_violet"], 22)
-                else:
+        if not getattr(self, "_alive", False):
+            return False
+        try:
+            if (
+                isinstance(watched, self._INTERACTIVE_TYPES)
+                and not isinstance(watched.parent(), QSpinBox)
+                and self._root.isAncestorOf(watched)
+            ):
+                et = event.type()
+                if et in (QEvent.Type.Enter, QEvent.Type.HoverEnter):
+                    setattr(watched, "_glow_hover", True)
+                    self._sync_widget_glow(watched)
+                elif et in (QEvent.Type.Leave, QEvent.Type.HoverLeave):
+                    setattr(watched, "_glow_hover", False)
+                    setattr(watched, "_glow_press", False)
+                    self._sync_widget_glow(watched)
+                elif et == QEvent.Type.FocusIn:
+                    is_btn_like = isinstance(watched, (QPushButton, QCheckBox))
+                    reason = event.reason() if hasattr(event, "reason") else Qt.FocusReason.OtherFocusReason
+                    if not is_btn_like or reason in self._KEYBOARD_FOCUS_REASONS:
+                        setattr(watched, "_glow_focus", True)
+                        self._sync_widget_glow(watched)
+                elif et == QEvent.Type.FocusOut:
+                    setattr(watched, "_glow_focus", False)
+                    setattr(watched, "_glow_press", False)
+                    self._sync_widget_glow(watched)
+                elif et == QEvent.Type.MouseButtonPress:
+                    setattr(watched, "_glow_press", True)
+                    self._sync_widget_glow(watched)
+                elif et == QEvent.Type.MouseButtonRelease:
+                    setattr(watched, "_glow_press", False)
+                    setattr(watched, "_glow_hover", watched.underMouse())
+                    self._sync_widget_glow(watched)
+                elif et == QEvent.Type.Hide or (et == QEvent.Type.EnabledChange and not watched.isEnabled()):
+                    setattr(watched, "_glow_hover", False)
+                    setattr(watched, "_glow_focus", False)
+                    setattr(watched, "_glow_press", False)
+                    anim: Optional[QVariantAnimation] = getattr(watched, "_glow_anim", None)
+                    if anim is not None:
+                        anim.stop()
                     watched.setGraphicsEffect(None)
-            elif et in (QEvent.Type.Leave, QEvent.Type.HoverLeave, QEvent.Type.Hide):
-                watched.setGraphicsEffect(None)
+        except RuntimeError:
+            return False
         return False
+
+
+class TabTransitionOverlay(QWidget):
+    """Smooth ~150ms Cyber-Aurora glass shimmer overlay when switching module tabs."""
+
+    def __init__(self, parent_tabs: QTabWidget) -> None:
+        super().__init__(parent_tabs)
+        self._tabs = parent_tabs
+        self._alpha: float = 0.0
+        self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
+        self.setAttribute(Qt.WidgetAttribute.WA_NoSystemBackground, True)
+        self.hide()
+
+        self._anim = QVariantAnimation(self)
+        self._anim.setDuration(150)
+        self._anim.setEasingCurve(QEasingCurve.Type.OutCubic)
+        self._anim.setStartValue(55.0)
+        self._anim.setEndValue(0.0)
+        self._anim.valueChanged.connect(self._on_step)
+        self._anim.finished.connect(self.hide)
+
+    def _on_step(self, val) -> None:
+        self._alpha = float(val)
+        self.update()
+
+    def start_transition(self) -> None:
+        bar_h = self._tabs.tabBar().height()
+        w = self._tabs.width()
+        h = max(0, self._tabs.height() - bar_h)
+        if w <= 0 or h <= 0:
+            return
+        self.setGeometry(0, bar_h, w, h)
+        self.raise_()
+        self.show()
+        self._anim.stop()
+        self._anim.start()
+
+    def paintEvent(self, _event) -> None:
+        if self._alpha <= 0.5:
+            return
+        painter = QPainter(self)
+        grad = QLinearGradient(0, 0, self.width(), self.height())
+        c1 = QColor(COLORS["glow_violet"])
+        c1.setAlpha(int(self._alpha))
+        c2 = QColor(COLORS["glow_cyan"])
+        c2.setAlpha(int(self._alpha * 0.7))
+        c3 = QColor(COLORS["bg_dark"])
+        c3.setAlpha(int(self._alpha * 0.45))
+        grad.setColorAt(0.0, c1)
+        grad.setColorAt(0.5, c2)
+        grad.setColorAt(1.0, c3)
+        painter.fillRect(self.rect(), grad)
 
 
 def normalize_link_target(raw_target: str) -> str:
@@ -173,6 +368,7 @@ class ScratchpadEditor(QTextEdit):
         super().__init__(parent)
         self.setMouseTracking(True)
         self.setAcceptRichText(True)
+        self.setTabChangesFocus(True)
         self._url_highlighter = ScratchpadUrlHighlighter(self.document())
 
     def contextMenuEvent(self, event) -> None:
@@ -720,8 +916,12 @@ class TimerRendezVousWidget(QWidget):
         title_lbl.setStyleSheet(f"font-size: 16px; font-weight: bold; color: {COLORS['text']};")
         hdr.addWidget(title_lbl)
 
-        sub_lbl = QLabel("Ctrl+F8 | Keys 1-7")
+        sub_lbl = QLabel("Ctrl+F8 | 1-7 | F1")
         sub_lbl.setStyleSheet(f"font-size: 10px; color: {COLORS['text_muted']};")
+        sub_lbl.setToolTip(
+            "Tab/Shift+Tab: Navigate controls • Ctrl+PgUp/PgDn: Switch tabs • "
+            "Ctrl+K: Natural bar • Ctrl+Q: Queue • F1: All Shortcuts"
+        )
         hdr.addWidget(sub_lbl)
 
         hdr.addStretch()
@@ -763,7 +963,9 @@ class TimerRendezVousWidget(QWidget):
         self.top_deck_stack = QStackedWidget(self)
         self.hero_deck_frame = QFrame()
         self.hero_deck_frame.setStyleSheet(
-            f"QFrame {{ background-color: {COLORS['surface']}; border: 1px solid {COLORS['border']}; border-radius: 6px; }}"
+            f"QFrame {{ background-color: qlineargradient(x1:0, y1:0, x2:0, y2:1, "
+            f"stop:0 #1d213a, stop:0.15 {COLORS['surface']}, stop:1 #0f111d); "
+            f"border: 1px solid {COLORS['border']}; border-top: 1px solid {COLORS['border_shine']}; border-radius: 6px; }}"
         )
         deck_layout = QHBoxLayout(self.hero_deck_frame)
         deck_layout.setContentsMargins(6, 5, 6, 5)
@@ -852,6 +1054,8 @@ class TimerRendezVousWidget(QWidget):
         self.tab_activity = QWidget()
         self.tab_scratchpad = QWidget()
         self.tab_go = GoTroubleshootingTab(self, custom_targets=self.app_config.custom_go_targets)
+        if hasattr(self.tab_go, "progress_bar"):
+            self.tab_go.progress_bar.setStyleSheet("")
         self.tab_history = QWidget()
         self.tab_settings = QWidget()
 
@@ -880,12 +1084,15 @@ class TimerRendezVousWidget(QWidget):
         self.tab_go.sendToScratchpad.connect(self._append_to_scratchpad)
         self.tab_go.diagnostic_completed.connect(self._on_go_diagnostic_completed)
         self.tab_go.customTargetsChanged.connect(self._on_custom_go_targets_changed)
+        self._tab_transition = TabTransitionOverlay(self.main_tabs)
         self.main_tabs.currentChanged.connect(self._on_main_tab_changed)
 
         parent_layout.addWidget(self.main_tabs, 5)
 
     def _on_main_tab_changed(self, index: int) -> None:
         """Keep tabs bar height uniform across all 7 tabs via top_deck_stack and manage queue visibility."""
+        if hasattr(self, "_tab_transition") and self.isVisible():
+            self._tab_transition.start_transition()
         current_tab = self.main_tabs.widget(index)
         if hasattr(self, "top_deck_stack"):
             if current_tab == self.tab_scratchpad and hasattr(self, "scratchpad_top_frame"):
@@ -921,10 +1128,10 @@ class TimerRendezVousWidget(QWidget):
                 self.root_layout.setStretchFactor(self.main_tabs, 5)
                 self.root_layout.setStretchFactor(self.active_queue_group, 3)
 
-    # ── Tab Navigation Keyboard Shortcuts (Keys 1 to 7) ──────────────────────
+    # ── Tab & Keyboard Navigation Shortcuts ──────────────────────────────────
 
     def _setup_tab_navigation_shortcuts(self) -> None:
-        """Bind keys 1–7 (and Alt+1..Alt+7) to navigate directly between tabs 1–7."""
+        """Bind global-window & tab navigation shortcuts and install keyboard/glow filters."""
         keys = [
             Qt.Key.Key_1,
             Qt.Key.Key_2,
@@ -944,34 +1151,247 @@ class TimerRendezVousWidget(QWidget):
             app.installEventFilter(self)
             self._button_glow_filter = ButtonGlowFilter(self)
             app.installEventFilter(self._button_glow_filter)
+
     def _activate_tab_shortcut(self, index: int) -> None:
         if 0 <= index < self.main_tabs.count():
             self.main_tabs.setCurrentIndex(index)
             self.main_tabs.tabBar().setFocus()
 
+    def _step_tab(self, delta: int) -> None:
+        count = self.main_tabs.count()
+        if count > 0:
+            self._activate_tab_shortcut((self.main_tabs.currentIndex() + delta) % count)
+
+    def _focus_quick_schedule(self) -> None:
+        if self.main_tabs.currentWidget() in (self.tab_scratchpad, self.tab_go, self.tab_settings):
+            self.main_tabs.setCurrentWidget(self.tab_timers)
+        self.smart_entry.setFocus(Qt.FocusReason.ShortcutFocusReason)
+        self.smart_entry.selectAll()
+
+    def _focus_active_queue(self) -> None:
+        if self.main_tabs.currentWidget() in (
+            self.tab_activity,
+            self.tab_scratchpad,
+            self.tab_go,
+            self.tab_history,
+        ):
+            self.main_tabs.setCurrentWidget(self.tab_timers)
+        if self.listbox.count() > 0 and self.listbox.currentRow() < 0:
+            self.listbox.setCurrentRow(0)
+        self.listbox.setFocus(Qt.FocusReason.ShortcutFocusReason)
+
+    def _pause_focused_or_active(self) -> None:
+        fw = QApplication.focusWidget()
+        if fw is self.listbox and 0 <= self.listbox.currentRow() < len(self.scheduler.items):
+            self._toggle_selected_pause()
+        elif fw is self.activity_timer_lb and 0 <= self.activity_timer_lb.currentRow() < len(self._activity_timer_items):
+            self._activity_pause_timer()
+        else:
+            self._toggle_active_timer_pause()
+
+    def _edit_focused_or_active(self) -> None:
+        fw = QApplication.focusWidget()
+        if fw is self.activity_timer_lb and 0 <= self.activity_timer_lb.currentRow() < len(self._activity_timer_items):
+            self._activity_edit_timer()
+        elif fw is self.activity_rdv_lb and 0 <= self.activity_rdv_lb.currentRow() < len(self._activity_rdv_items):
+            self._activity_edit_rdv()
+        elif fw is self.listbox and 0 <= self.listbox.currentRow() < len(self.scheduler.items):
+            self._edit_selected_queue_item()
+        else:
+            self._edit_active_or_selected_item()
+
+    def _show_shortcuts_dialog(self) -> None:
+        existing: Optional[QDialog] = getattr(self, "_shortcuts_dialog", None)
+        if existing is not None:
+            try:
+                existing.show()
+                existing.raise_()
+                existing.activateWindow()
+                return
+            except RuntimeError:
+                pass
+
+        dlg = QDialog(self)
+        dlg.setWindowTitle("⌨️ TimeSpace Keyboard Shortcuts")
+        dlg.setMinimumWidth(460)
+        dlg.setStyleSheet(DARK_QSS)
+        lay = QVBoxLayout(dlg)
+        lay.setContentsMargins(12, 10, 12, 10)
+        lay.setSpacing(8)
+
+        title = QLabel("⌨️ Keyboard Navigation & Shortcuts")
+        title.setStyleSheet(f"color: {COLORS['glow_cyan']}; font-size: 14px; font-weight: bold;")
+        lay.addWidget(title)
+
+        shortcuts_html = (
+            f"<table cellspacing='4' style='color: {COLORS['text']}; font-size: 12px;'>"
+            f"<tr><td><b style='color:{COLORS['glow_cyan']}'>Ctrl + F8</b></td><td>Show / Minimize TimeSpace (Global)</td></tr>"
+            f"<tr><td><b style='color:{COLORS['glow_cyan']}'>Ctrl + Shift + M</b></td><td>Toggle Discreet Meeting Mode (Global)</td></tr>"
+            f"<tr><td><b style='color:{COLORS['glow_cyan']}'>Tab / Shift + Tab</b></td><td>Move forward / backward across all visible controls</td></tr>"
+            f"<tr><td><b style='color:{COLORS['glow_cyan']}'>Ctrl + PgDn / PgUp</b></td><td>Switch to Next / Previous tab (also Ctrl+Tab / Ctrl+Shift+Tab)</td></tr>"
+            f"<tr><td><b style='color:{COLORS['glow_cyan']}'>1 – 7 / Alt + 1 – 7</b></td><td>Jump directly to Tab 1 (Timers) – Tab 7 (Settings)</td></tr>"
+            f"<tr><td><b style='color:{COLORS['glow_cyan']}'>Ctrl + K</b></td><td>Focus ✨ Quick Natural Schedule bar</td></tr>"
+            f"<tr><td><b style='color:{COLORS['glow_cyan']}'>Ctrl + Q</b></td><td>Focus Active Reminders Queue</td></tr>"
+            f"<tr><td><b style='color:{COLORS['glow_cyan']}'>Ctrl + P / Ctrl + Space</b></td><td>Pause / Resume active or selected reminder</td></tr>"
+            f"<tr><td><b style='color:{COLORS['glow_cyan']}'>Ctrl + E</b></td><td>Edit active or selected Timer / RDV inline</td></tr>"
+            f"<tr><td><b style='color:{COLORS['glow_cyan']}'>Ctrl + H</b></td><td>Toggle 📌 Floating Mini HUD</td></tr>"
+            f"<tr><td><b style='color:{COLORS['glow_cyan']}'>Ctrl + S</b></td><td>Save Settings (Tab 7), Edit (Tab 1/2), Export Go (Tab 5), or Scratchpad</td></tr>"
+            f"<tr><td><b style='color:{COLORS['glow_cyan']}'>Ctrl + B / T / F</b></td><td>Scratchpad: Bold, Timestamp, Find Bar</td></tr>"
+            f"<tr><td><b style='color:{COLORS['glow_cyan']}'>F5</b></td><td>Tab 5 Go: Run Quick Ping & TCP diagnostic</td></tr>"
+            f"<tr><td><b style='color:{COLORS['glow_cyan']}'>Enter / Space</b></td><td>Activate focused button or edit selected Queue / Activity item</td></tr>"
+            f"<tr><td><b style='color:{COLORS['glow_cyan']}'>Delete</b></td><td>Remove selected item in Queue, Activity, or History</td></tr>"
+            f"<tr><td><b style='color:{COLORS['glow_cyan']}'>Escape</b></td><td>Close open Find Bar or return focus to Tabs Bar</td></tr>"
+            "</table>"
+        )
+        lbl = QLabel(shortcuts_html)
+        lbl.setTextFormat(Qt.TextFormat.RichText)
+        lbl.setWordWrap(True)
+        lay.addWidget(lbl)
+
+        btn_close = QPushButton("Close (Esc)")
+        btn_close.setObjectName("primaryBtn")
+        btn_close.clicked.connect(dlg.close)
+        lay.addWidget(btn_close, alignment=Qt.AlignmentFlag.AlignRight)
+
+        self._shortcuts_dialog = dlg
+        dlg.show()
+
+    @staticmethod
+    def _is_typing_widget(fw: Optional[QWidget]) -> bool:
+        if isinstance(fw, (QLineEdit, QSpinBox)):
+            return not fw.isReadOnly()
+        if isinstance(fw, (QTextEdit, QPlainTextEdit)):
+            return not fw.isReadOnly()
+        if isinstance(fw, QComboBox):
+            return fw.isEditable()
+        return False
+
     def eventFilter(self, watched: QObject, event: QEvent) -> bool:
-        if event.type() == QEvent.Type.KeyPress and self.isVisible():
+        try:
+            visible = self.isVisible()
+        except RuntimeError:
+            return False
+
+        if (
+            event.type() == QEvent.Type.KeyPress
+            and visible
+            and QApplication.activePopupWidget() is None
+            and QApplication.activeModalWidget() is None
+        ):
+            fw = QApplication.focusWidget()
+            win = self.window()
+            belongs_to_us = (
+                (fw is not None and (fw is self or self.isAncestorOf(fw) or fw is win))
+                or (fw is None and win is not None and win.isActiveWindow())
+            )
+            if not belongs_to_us:
+                return super().eventFilter(watched, event)
+
             key = event.key()  # type: ignore[attr-defined]
             mods = event.modifiers()  # type: ignore[attr-defined]
+            ctrl_only = mods == Qt.KeyboardModifier.ControlModifier
+
+            # 1. Tab cycling: Ctrl+PgUp / Ctrl+PgDn & Ctrl+Tab / Ctrl+Shift+Tab
+            if (ctrl_only and key in (Qt.Key.Key_PageDown, Qt.Key.Key_Tab)):
+                self._step_tab(1)
+                return True
+            if (
+                (ctrl_only and key == Qt.Key.Key_PageUp)
+                or (key == Qt.Key.Key_Tab and mods == (Qt.KeyboardModifier.ControlModifier | Qt.KeyboardModifier.ShiftModifier))
+                or (key == Qt.Key.Key_Backtab and bool(mods & Qt.KeyboardModifier.ControlModifier))
+            ):
+                self._step_tab(-1)
+                return True
+
+            # 2. Global-app Ctrl shortcuts
+            if ctrl_only:
+                if key == Qt.Key.Key_K:
+                    self._focus_quick_schedule()
+                    return True
+                if key == Qt.Key.Key_Q:
+                    self._focus_active_queue()
+                    return True
+                if key == Qt.Key.Key_H:
+                    self._toggle_hud()
+                    return True
+                if key in (Qt.Key.Key_P, Qt.Key.Key_Space):
+                    self._pause_focused_or_active()
+                    return True
+                if key == Qt.Key.Key_E:
+                    self._edit_focused_or_active()
+                    return True
+                if key == Qt.Key.Key_S and not isinstance(fw, ScratchpadEditor):
+                    cur = self.main_tabs.currentWidget()
+                    if cur == self.tab_settings:
+                        self._save_settings()
+                        return True
+                    if cur == self.tab_go:
+                        self.tab_go.export_console_report()
+                        return True
+                    if cur == self.tab_timers and self._editing_timer_id:
+                        self._start_custom_timer()
+                        return True
+                    if cur == self.tab_rdv and self._editing_rdv_id:
+                        self._add_rendez_vous()
+                        return True
+
+            # 3. F1 (or '?' outside text inputs) -> Shortcuts Reference
+            if (mods == Qt.KeyboardModifier.NoModifier and key == Qt.Key.Key_F1) or (
+                key == Qt.Key.Key_Question and not self._is_typing_widget(fw)
+            ):
+                self._show_shortcuts_dialog()
+                return True
+
+            # 4. F5 on Go Tab -> Quick Ping & TCP diagnostic
+            if mods == Qt.KeyboardModifier.NoModifier and key == Qt.Key.Key_F5:
+                if self.main_tabs.currentWidget() == self.tab_go:
+                    self.tab_go.run_diagnostic("ping")
+                    return True
+
+            # 5. Smart Escape: close any open Scratchpad Find bar first, else defocus to TabBar
             if key == Qt.Key.Key_Escape:
-                fw = QApplication.focusWidget()
+                for pane_attr in ("upper_scratchpad_pane", "lower_scratchpad_pane", "go_scratchpad_pane"):
+                    pane = getattr(self, pane_attr, None)
+                    if pane is not None and pane.find_bar.isVisible():
+                        pane.hide_find_bar()
+                        return True
                 if fw is not None and self.isAncestorOf(fw):
                     fw.clearFocus()
                     self.main_tabs.tabBar().setFocus()
                     return True
+
+            # 6. Delete / Enter in Active Queue & Activity lists + Enter on focused buttons
+            if mods == Qt.KeyboardModifier.NoModifier:
+                if key == Qt.Key.Key_Delete:
+                    if fw is self.listbox:
+                        self._delete_selected()
+                        return True
+                    if fw is self.activity_timer_lb:
+                        self._activity_delete_timer()
+                        return True
+                    if fw is self.activity_rdv_lb:
+                        self._activity_delete_rdv()
+                        return True
+                if key in (Qt.Key.Key_Return, Qt.Key.Key_Enter):
+                    if isinstance(fw, QPushButton):
+                        fw.click()
+                        return True
+                    if fw is self.listbox:
+                        self._edit_selected_queue_item()
+                        return True
+                    if fw is self.activity_timer_lb:
+                        self._activity_edit_timer()
+                        return True
+                    if fw is self.activity_rdv_lb:
+                        self._activity_edit_rdv()
+                        return True
+
+            # 7. Single-key 1–7 tab switching when not typing in an input
             if mods == Qt.KeyboardModifier.NoModifier and Qt.Key.Key_1 <= key <= Qt.Key.Key_7:
-                fw = QApplication.focusWidget()
-                is_typing_input = False
-                if isinstance(fw, (QLineEdit, QSpinBox)):
-                    is_typing_input = not fw.isReadOnly()
-                elif isinstance(fw, (QTextEdit, QPlainTextEdit)):
-                    is_typing_input = not fw.isReadOnly()
-                elif isinstance(fw, QComboBox):
-                    is_typing_input = fw.isEditable()
-                if not is_typing_input:
-                    tab_idx = int(key - Qt.Key.Key_1)
-                    self._activate_tab_shortcut(tab_idx)
+                if not self._is_typing_widget(fw):
+                    self._activate_tab_shortcut(int(key - Qt.Key.Key_1))
                     return True
+
         return super().eventFilter(watched, event)
 
     # ── Tab 1: Timers (Compact Presets, Non-Overlapping Countdown & Inline Editing) ──
@@ -1416,7 +1836,9 @@ class TimerRendezVousWidget(QWidget):
 
         self.scratchpad_top_frame = QFrame(self)
         self.scratchpad_top_frame.setStyleSheet(
-            f"QFrame {{ background-color: {COLORS['surface']}; border: 1px solid {COLORS['border']}; border-radius: 6px; }}"
+            f"QFrame {{ background-color: qlineargradient(x1:0, y1:0, x2:0, y2:1, "
+            f"stop:0 #1d213a, stop:0.15 {COLORS['surface']}, stop:1 #0f111d); "
+            f"border: 1px solid {COLORS['border']}; border-top: 1px solid {COLORS['border_shine']}; border-radius: 6px; }}"
         )
         top_sp_layout = QVBoxLayout(self.scratchpad_top_frame)
         top_sp_layout.setContentsMargins(6, 3, 6, 3)
@@ -2817,14 +3239,28 @@ class TimerRendezVousWidget(QWidget):
                 self.btn_meeting_mode.setToolTip("Meeting Mode Active (Audio Muted)")
 
             self.btn_meeting_mode.setStyleSheet(
-                f"QPushButton {{ background-color: {COLORS['surface_light']}; color: {COLORS['glow_cyan']}; "
-                f"border: 1px solid {COLORS['glow_cyan']}; border-radius: 4px; font-weight: bold; padding: 2px 8px; }}"
+                f"QPushButton {{ background-color: qlineargradient(x1:0, y1:0, x2:1, y2:1, "
+                f"stop:0 #163047, stop:1 {COLORS['surface_light']}); color: {COLORS['glow_cyan']}; "
+                f"border: 1px solid {COLORS['glow_cyan']}; border-top: 1px solid {COLORS['glow_specular']}; "
+                f"border-radius: 4px; font-weight: bold; padding: 2px 8px; }}"
+                f"QPushButton:hover {{ background-color: qlineargradient(x1:0, y1:0, x2:1, y2:1, "
+                f"stop:0 {COLORS['glow_violet']}, stop:1 {COLORS['glow_cyan']}); color: #ffffff; "
+                f"border: 1px solid {COLORS['glow_specular']}; }}"
+                f"QPushButton:pressed {{ background-color: qlineargradient(x1:0, y1:0, x2:1, y2:1, "
+                f"stop:0 {COLORS['glow_cyan']}, stop:1 {COLORS['glow_green']}); color: #090a12; }}"
             )
         else:
             self.btn_meeting_mode.setText("🔔 Normal")
             self.btn_meeting_mode.setStyleSheet(
-                f"QPushButton {{ background-color: {COLORS['surface']}; color: {COLORS['text_muted']}; "
-                f"border: 1px solid {COLORS['border']}; border-radius: 4px; padding: 2px 8px; }}"
+                f"QPushButton {{ background-color: qlineargradient(x1:0, y1:0, x2:0, y2:1, "
+                f"stop:0 #2b3158, stop:1 {COLORS['surface']}); color: {COLORS['text_muted']}; "
+                f"border: 1px solid {COLORS['border']}; border-top: 1px solid {COLORS['border_shine']}; "
+                f"border-radius: 4px; padding: 2px 8px; }}"
+                f"QPushButton:hover {{ background-color: qlineargradient(x1:0, y1:0, x2:1, y2:1, "
+                f"stop:0 {COLORS['glow_violet']}, stop:1 {COLORS['glow_cyan']}); color: #ffffff; "
+                f"border: 1px solid {COLORS['glow_specular']}; }}"
+                f"QPushButton:pressed {{ background-color: qlineargradient(x1:0, y1:0, x2:1, y2:1, "
+                f"stop:0 {COLORS['glow_cyan']}, stop:1 {COLORS['glow_green']}); color: #090a12; }}"
             )
             self.btn_meeting_mode.setToolTip(
                 "Meeting Mode: Idle (Audio enabled)\nLeft-click to mute | Right-click for timed presets | Ctrl+Shift+M"
@@ -3258,6 +3694,10 @@ class MainApp(QMainWindow):
             self.module_widget.hud.close()
         if hasattr(self.module_widget, "ahk_manager") and self.module_widget.ahk_manager.is_running():
             self.module_widget.ahk_manager.stop_script()
+        if self._qt_app is not None:
+            if hasattr(self.module_widget, "_button_glow_filter"):
+                self._qt_app.removeEventFilter(self.module_widget._button_glow_filter)
+            self._qt_app.removeEventFilter(self.module_widget)
         self.tray.stop()
         self._qt_app.quit()
 

@@ -307,6 +307,7 @@ class GoTroubleshootingTab(QWidget):
 
         self.console = QPlainTextEdit()
         self.console.setReadOnly(True)
+        self.console.setTabChangesFocus(True)
         self.console.setMinimumHeight(90)
         mono_family = "Consolas" if sys.platform == "win32" else "Monospace"
         self.console.setFont(QFont(mono_family, 10))

@@ -45,7 +45,9 @@ class BigButtonsTimePicker(QWidget):
         disp_frame = QFrame()
         disp_frame.setMinimumWidth(0)
         disp_frame.setStyleSheet(
-            f"background-color: {COLORS['bg_dark']}; border: 1px solid {COLORS['border']}; border-radius: 5px;"
+            f"background-color: qlineargradient(x1:0, y1:0, x2:1, y2:1, "
+            f"stop:0 #151932, stop:1 {COLORS['bg_dark']}); "
+            f"border: 1px solid {COLORS['glow_cyan']}; border-radius: 5px;"
         )
         disp_layout = QHBoxLayout(disp_frame)
         disp_layout.setContentsMargins(6, 2, 6, 2)
@@ -53,7 +55,8 @@ class BigButtonsTimePicker(QWidget):
         self.lbl_time = QLabel("14:00")
         self.lbl_time.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.lbl_time.setStyleSheet(
-            f"color: {COLORS['accent']}; font-family: 'Consolas', monospace; font-size: 16px; font-weight: bold; border: none;"
+            f"color: {COLORS['glow_cyan']}; background: transparent; "
+            f"font-family: 'Consolas', monospace; font-size: 16px; font-weight: bold; border: none;"
         )
         disp_layout.addWidget(self.lbl_time)
         top_grid.addWidget(disp_frame, 0, 0, 1, 2)
@@ -96,8 +99,12 @@ class BigButtonsTimePicker(QWidget):
             btn_p.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
             btn_p.setCursor(Qt.CursorShape.PointingHandCursor)
             btn_p.setStyleSheet(
-                f"background-color: {COLORS['surface_light']}; color: {COLORS['text_muted']}; "
-                f"font-size: 10px; padding: 1px 3px; border-radius: 3px;"
+                f"QPushButton {{ background-color: qlineargradient(x1:0, y1:0, x2:0, y2:1, "
+                f"stop:0 #262b4d, stop:1 {COLORS['surface']}); color: {COLORS['text_muted']}; "
+                f"border: 1px solid {COLORS['border']}; font-size: 10px; padding: 1px 3px; border-radius: 3px; }}"
+                f"QPushButton:hover {{ background-color: qlineargradient(x1:0, y1:0, x2:1, y2:1, "
+                f"stop:0 {COLORS['glow_violet']}, stop:1 {COLORS['glow_cyan']}); color: #ffffff; "
+                f"border: 1px solid {COLORS['glow_specular']}; }}"
             )
             btn_p.clicked.connect(lambda _checked=False, hv=h_val: self._set_preset(hv, 0))
             preset_row.addWidget(btn_p, 1)
@@ -129,13 +136,18 @@ class BigButtonsTimePicker(QWidget):
         for m_val, btn in self.min_btns.items():
             if m_val == self.minute:
                 btn.setStyleSheet(
-                    f"background-color: {COLORS['accent']}; color: #ffffff; font-weight: bold; "
-                    f"font-size: 11px; padding: 1px 4px; border: 1px solid {COLORS['accent']}; border-radius: 4px;"
+                    f"QPushButton {{ background-color: qlineargradient(x1:0, y1:0, x2:1, y2:1, "
+                    f"stop:0 {COLORS['glow_cyan']}, stop:1 {COLORS['glow_green']}); color: #090a12; font-weight: bold; "
+                    f"font-size: 11px; padding: 1px 4px; border: 1px solid {COLORS['glow_specular']}; border-radius: 4px; }}"
                 )
             else:
                 btn.setStyleSheet(
-                    f"background-color: {COLORS['surface_light']}; color: {COLORS['text_muted']}; "
-                    f"font-size: 11px; padding: 1px 4px; border: 1px solid {COLORS['border']}; border-radius: 4px;"
+                    f"QPushButton {{ background-color: qlineargradient(x1:0, y1:0, x2:0, y2:1, "
+                    f"stop:0 #262b4d, stop:1 {COLORS['surface']}); color: {COLORS['text_muted']}; "
+                    f"font-size: 11px; padding: 1px 4px; border: 1px solid {COLORS['border']}; border-radius: 4px; }}"
+                    f"QPushButton:hover {{ background-color: qlineargradient(x1:0, y1:0, x2:1, y2:1, "
+                    f"stop:0 {COLORS['glow_violet']}, stop:1 {COLORS['glow_cyan']}); color: #ffffff; "
+                    f"border: 1px solid {COLORS['glow_specular']}; }}"
                 )
         self.timeChanged.emit(self.hour, self.minute)
         if self._legacy_on_change:

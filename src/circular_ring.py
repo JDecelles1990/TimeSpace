@@ -1,8 +1,8 @@
 """Radial Circular Progress Ring for countdown visualization drawn with PySide6 QPainter."""
 import math
 from typing import Optional
-from PySide6.QtCore import Qt, QRectF
-from PySide6.QtGui import QPainter, QPen, QColor, QFont
+from PySide6.QtCore import Qt, QRectF, QPointF
+from PySide6.QtGui import QPainter, QPen, QColor, QFont, QLinearGradient, QRadialGradient
 from PySide6.QtWidgets import QWidget
 from src.config import COLORS, FONT_FAMILY, UI_DIMENSIONS
 
@@ -20,7 +20,8 @@ class CircularProgressRing(QWidget):
         self.setFixedSize(self.size_px, self.size_px)
 
         self._ratio: float = 0.0
-        self._arc_color: str = COLORS["surface_light"]
+        self._arc_color: str = COLORS["glow_violet"]
+        self._arc_end_color: str = COLORS["glow_cyan"]
         self._time_text: str = "--:--"
         self._title_text: str = "All Quiet"
         self._badge_text: str = ""
@@ -42,12 +43,16 @@ class CircularProgressRing(QWidget):
 
         if is_paused:
             self._arc_color = COLORS["surface_light"]
+            self._arc_end_color = COLORS["border_shine"]
         elif self._ratio < 0.10:
             self._arc_color = COLORS["accent_danger"]
+            self._arc_end_color = "#fda4af"
         elif self._ratio < 0.25:
             self._arc_color = COLORS["accent_warning"]
+            self._arc_end_color = "#fde047"
         else:
-            self._arc_color = COLORS["accent"]
+            self._arc_color = COLORS["glow_violet"]
+            self._arc_end_color = COLORS["glow_cyan"]
 
         total_int = int(math.ceil(remaining_sec))
         m, s = divmod(total_int, 60)
@@ -59,10 +64,10 @@ class CircularProgressRing(QWidget):
 
         if is_paused:
             self._badge_text = "⏸ PAUSED"
-            self._badge_color = COLORS["accent_warning"]
+            self._badge_color = COLORS["glow_gold"]
         elif is_repeating:
             self._badge_text = "🔁 Repeat"
-            self._badge_color = COLORS["accent_success"]
+            self._badge_color = COLORS["glow_green"]
         else:
             self._badge_text = ""
 
@@ -72,6 +77,7 @@ class CircularProgressRing(QWidget):
         """Reset ring to calm waiting state."""
         self._ratio = 0.0
         self._arc_color = COLORS["surface_light"]
+        self._arc_end_color = COLORS["border_shine"]
         self._time_text = "--:--"
         self._title_text = "All Quiet"
         self._badge_text = ""
@@ -81,26 +87,69 @@ class CircularProgressRing(QWidget):
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
 
-        pad = self.ring_width + 4
+        pad = self.ring_width + 6
         rect = QRectF(pad, pad, self.size_px - 2 * pad, self.size_px - 2 * pad)
+        cx = self.size_px / 2.0
+        cy = self.size_px / 2.0
+        radius = rect.width() / 2.0
 
-        # Track circle
-        track_pen = QPen(QColor(COLORS["surface"]), self.ring_width)
-        track_pen.setCapStyle(Qt.PenCapStyle.RoundCap)
-        painter.setPen(track_pen)
+        # Inner dark glass dial radial fill
+        dial_grad = QRadialGradient(QPointF(cx, cy - radius * 0.15), radius)
+        dial_grad.setColorAt(0.0, QColor("#1b1f38"))
+        dial_grad.setColorAt(0.75, QColor("#111324"))
+        dial_grad.setColorAt(1.0, QColor(COLORS["bg_dark"]))
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.setBrush(dial_grad)
         painter.drawEllipse(rect)
 
-        # Progress arc (clockwise from 12 o'clock = 90 * 16)
+        # Track circle
+        track_pen = QPen(QColor("#202442"), self.ring_width)
+        track_pen.setCapStyle(Qt.PenCapStyle.RoundCap)
+        painter.setPen(track_pen)
+        painter.setBrush(Qt.BrushStyle.NoBrush)
+        painter.drawEllipse(rect)
+
+        # Progress arc with outer neon halo + multi-stop gradient + tip orb
         if self._ratio > 0.001:
-            arc_pen = QPen(QColor(self._arc_color), self.ring_width)
-            arc_pen.setCapStyle(Qt.PenCapStyle.RoundCap)
-            painter.setPen(arc_pen)
             start_angle = 90 * 16
             span_angle = -int(self._ratio * 360 * 16)
+
+            for extra_w, alpha in ((6, 45), (3, 95)):
+                halo_color = QColor(self._arc_end_color)
+                halo_color.setAlpha(alpha)
+                halo_pen = QPen(halo_color, self.ring_width + extra_w)
+                halo_pen.setCapStyle(Qt.PenCapStyle.RoundCap)
+                painter.setPen(halo_pen)
+                painter.drawArc(rect, start_angle, span_angle)
+
+            arc_grad = QLinearGradient(rect.topLeft(), rect.bottomRight())
+            arc_grad.setColorAt(0.0, QColor(self._arc_color))
+            arc_grad.setColorAt(0.55, QColor(self._arc_end_color))
+            arc_grad.setColorAt(
+                1.0,
+                QColor(COLORS["glow_green"] if self._arc_color == COLORS["glow_violet"] else self._arc_end_color),
+            )
+            arc_pen = QPen(arc_grad, self.ring_width)
+            arc_pen.setCapStyle(Qt.PenCapStyle.RoundCap)
+            painter.setPen(arc_pen)
             painter.drawArc(rect, start_angle, span_angle)
 
+            # Specular glowing tip orb
+            rad = math.radians(90.0 - self._ratio * 360.0)
+            tip_pt = QPointF(cx + radius * math.cos(rad), cy - radius * math.sin(rad))
+            orb_r = self.ring_width * 0.95
+            orb_grad = QRadialGradient(tip_pt, orb_r)
+            orb_grad.setColorAt(0.0, QColor("#ffffff"))
+            orb_grad.setColorAt(0.45, QColor(self._arc_end_color))
+            edge_clear = QColor(self._arc_end_color)
+            edge_clear.setAlpha(0)
+            orb_grad.setColorAt(1.0, edge_clear)
+            painter.setPen(Qt.PenStyle.NoPen)
+            painter.setBrush(orb_grad)
+            painter.drawEllipse(tip_pt, orb_r, orb_r)
+
         # Time readout
-        painter.setPen(QColor(COLORS["text"]))
+        painter.setPen(QColor(COLORS["glow_specular"] if self._ratio > 0.001 else COLORS["text"]))
         time_font = QFont(FONT_FAMILY, max(12, int(self.size_px * 0.13)), QFont.Weight.Bold)
         painter.setFont(time_font)
         time_rect = QRectF(0, self.size_px * 0.26, self.size_px, 28)

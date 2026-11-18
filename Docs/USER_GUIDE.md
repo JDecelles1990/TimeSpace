@@ -12,11 +12,14 @@
   - **Tab `4. Scratchpad 📝`**: Displays **`📝 Scratchpad 1 (Upper)`** above the tabs bar and **`📝 Scratchpad 2 (Lower)`** below.
   - **Tab `5. Go ⏱️`**: Displays the compact **`⚡ Go Diagnostic & Remediation Engine`** controls and action buttons above the tabs bar.
   - **Tab `7. Settings ⚙️`**: Displays the compact **`🔊 Sound, Transparency & System Preferences`** controls above the tabs bar.
-- **Neon Button Glow**: Every button glows with a violet ➔ cyan gradient while hovered and flashes a cyan ➔ green gradient while clicked. The 7 tab buttons use the same gradients (violet ➔ cyan on hover, cyan ➔ green for the active tab).
+- **Cyber-Aurora Neon Glass Design & Animated Transitions**:
+  - **Shiny 3D Buttons & Role-Matched Halos**: All buttons feature glossy top-shine gradients at rest and smoothly animate role-matched outer neon glows on hover and specular click bursts (`Violet/Cyan` standard, `Cyan` primary actions, `Emerald` save/open actions, `Rose-Magenta` stop/delete actions, `Gold` Admin CLI).
+  - **Glowing Inputs, Bars & Lists**: Text fields, spinboxes, dropdowns, and Scratchpad/Console editors glow violet on hover and electric cyan while focused; tabs, iridescent sliders, progress bars, scrollbars, splitter handles, and active list rows all illuminate with animated gradients.
+  - **Radial Ring Halo & Tab Shimmer**: The countdown ring glows with a multi-stop neon gradient and specular leading tip orb, and switching tabs plays a smooth ~150ms glass shimmer fade (`TabTransitionOverlay`).
 - **Header Bar**: Displays the application title, keyboard shortcut hint (`Ctrl+F8 | Keys 1-7`), the **`🔔 Normal` / `🤫 Meeting` Mode button** (left-click to toggle, right-click for timed mutes, `Ctrl+Shift+M`), the **App Window Opacity Slider (`🔆 45%–100%`, default `90%`)** immediately on the left of the **`📌 HUD`** button, and the **`📌 HUD`** toggle button.
 - **Left — ⭕ Radial Circular Progress Ring** *(visible above tabs bar on Tabs 1, 2, 3, and 6)*:
   - Smoothly depletes clockwise for your active timer (or nearest upcoming Rendez-vous when no timer is active).
-  - **Urgency Colors**: Indigo (`>25%` remaining) ➔ Amber (`<25%`) ➔ Crimson Red (`<10%`), with inline `⏸ PAUSED` and `🔁 Repeat` status badges.
+  - **Urgency Colors**: Neon Violet ➔ Cyan ➔ Emerald (`>25%` remaining) ➔ Gold/Amber (`<25%`) ➔ Rose/Crimson (`<10%`) with glowing leading tip orb and inline `⏸ PAUSED` / `🔁 Repeat` badges.
   - **`⏸️` / `▶️`** & **`⏹️`**: Compact emoji controls to directly pause/resume or cancel the active countdown.
 - **Right — ⚡ Quick Natural Schedule**:
   - Type an everyday English expression and press **`Enter`** or click **`⚡`**:
@@ -137,14 +140,23 @@
 |---|---|
 | **`Ctrl + F8`** *(Global)* | Minimize main window if visible, or restore & focus when minimized/hidden |
 | **`Ctrl + Shift + M`** *(Global)* | Toggle Meeting Mode ON/OFF (discreet silent alarms for calls & meetings) |
-| **`1` – `7`** *(or **`Alt+1` – `Alt+7`**)* | Jump directly to section tabs `1. Timers` through `7. Settings` (`Escape` clears input focus) |
-| **`Delete`** *(in `6. History 📜`)* | Delete selected individual entry/entries from the History list |
-| **`Double-Click` / `✏️`** *(Queue / Activity)* | Load active Timer or RDV into Tab 1 / Tab 2 for inline editing (`💾`) |
+| **`Tab` / `Shift + Tab`** | Navigate forward / backward across every visible button, input, slider, tab bar, Scratchpad, Go Console, and queue |
+| **`Ctrl + PgDn` / `Ctrl + PgUp`** *(or **`Ctrl+Tab` / `Ctrl+Shift+Tab`**)* | Switch to Next / Previous section tab (with wrap-around `7 ➔ 1` and `1 ➔ 7`) |
+| **`1` – `7`** *(or **`Alt+1` – `Alt+7`**)* | Jump directly to section tabs `1. Timers` through `7. Settings` |
+| **`Ctrl + K`** | Focus **✨ Quick Natural Schedule** input bar from any tab |
+| **`Ctrl + Q`** | Focus **Active Reminders Queue** list (switches to Tab 1 if hidden) |
+| **`Ctrl + P`** *(or **`Ctrl + Space`**)* | Pause / Resume selected reminder (when focused in Queue/Activity) or active timer |
+| **`Ctrl + E`** | Edit selected or active Timer / RDV inline |
+| **`Ctrl + H`** | Toggle **📌 Floating Mini HUD** |
+| **`Ctrl + S`** *(Context-Aware)* | Export Scratchpad to `C:\Temp` (inside Scratchpad), Save Settings (Tab 7), Save Edit (Tab 1/2), or Export Go report (Tab 5) |
+| **`F5`** *(in `5. Go ⏱️`)* | Run quick **Ping & TCP** diagnostic on current Target |
+| **`Enter` / `Space`** | Activate focused button or load selected Queue / Activity item into inline edit |
+| **`Delete`** *(Queue / Activity / History)* | Remove selected reminder or history entry |
+| **`Escape`** | Close open Scratchpad **Find Bar** first, or clear input focus back to Tabs Bar |
+| **`F1`** *(or **`?`** outside inputs)* | Open **⌨️ Keyboard Shortcuts Quick Reference** dialog |
 | **`Ctrl + T`** *(Scratchpads 1, 2, 3)* | Insert `[YYYY-MM-DD HH:MM:SS] ` timestamp at cursor |
 | **`Ctrl + B`** *(Scratchpads 1, 2, 3)* | Toggle **Bold** on highlighted text |
 | **`Ctrl + F`** *(Scratchpads 1, 2, 3)* | Toggle inline **Find Bar** (`Enter` / `▼` next match, `▲` previous match, `Escape` close) |
-| **`Ctrl + S`** *(Scratchpads 1, 2, 3)* | Export Scratchpad notes to `C:\Temp\TimeSpace_Scratchpad_<name>_<timestamp>.md` |
 | **`⏰` / Right-Click** *(Scratchpads 1, 2, 3)* | Schedule highlighted text (or current line) as a Timer or RDV with auto URL extraction |
 | **Left-Click URL** *(Scratchpads 1, 2, 3)* | Open any detected web link (`https://`, `www.`) in default browser |
-| **`Enter`** *(Inputs)* | Submit Quick Natural Schedule or Daily Task Timer form |
 | **Window `[X]` Button** | Hide window to Windows System Tray (timers keep running) |

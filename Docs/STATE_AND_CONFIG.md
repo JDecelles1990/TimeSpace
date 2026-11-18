@@ -114,16 +114,16 @@ Persisted as a JSON array in `data/hotstrings.json` via `Storage.load_hotstrings
 | `toast_height_rich` | `162` | Expanded `AlarmDialog` height when displaying an attached `note` and/or `🔗 Open Link` button. |
 | `toast_margin_right` / `toast_margin_bottom` | `18` / `48` | Screen-edge clearance from primary monitor work area. |
 
-### 2.3 `COLORS` Dark Palette & `DARK_QSS` Selectors
-- **Surfaces & Borders**: `bg_dark` (`#111116`), `surface` (`#1a1a22`), `surface_light` (`#262632`), `border` (`#2e2e3d`).
-- **Button Glow Gradients**: `glow_violet` (`#8b5cf6`), `glow_violet_light` (`#a78bfa`), `glow_cyan` (`#22d3ee`), `glow_green` (`#34d399`) — all `QPushButton:hover` states fill violet ➔ cyan, `:pressed` states fill cyan ➔ green; `QTabBar::tab:hover` fills violet ➔ cyan and `QTabBar::tab:selected` fills cyan ➔ green.
-- **Typography**: `text` (`#f4f4f5`), `text_muted` (`#9ca3af`).
-- **Semantic Accents**: `accent` (`#6366f1`), `accent_hover` (`#4f46e5`), `accent_link` (`#38bdf8`), `accent_success` (`#10b981`), `accent_warning` (`#f59e0b`), `accent_danger` (`#ef4444`).
-- **QSS Semantic `objectName` IDs & Popup Menus** (applied via `widget.setObjectName(...)` or `DARK_QSS`):
-  - `#primaryBtn`: Indigo primary action button (`Create ⚡`, `Start Timer ▶`, `Add RDV 📅`, `+Timestamp`).
-  - `#successBtn`: Emerald confirmation/action button (`Save Settings ✓`, `🔗 Open Link`).
-  - `#dangerBtn`: Muted button with crimson text that fills crimson on hover (`⏹ Stop`, `🗑️ Delete`, `🧹 Clear`).
-  - `QMenu`: Dark surface popup menu with indigo hover highlight for Scratchpad text color selection.
+### 2.3 `COLORS` Cyber-Aurora Neon Glass Palette & `DARK_QSS` Selectors
+- **Surfaces & Specular Borders**: `bg_dark` (`#0c0d16`), `surface` (`#141625`), `surface_light` (`#1e2238`), `border` (`#2e355b`), `border_shine` (`#4f5b9e`).
+- **Neon Glow & Gradient Accents**: `glow_violet` (`#8b5cf6`), `glow_violet_light` (`#c084fc`), `glow_cyan` (`#22d3ee`), `glow_green` (`#34d399`), `glow_magenta` (`#f43f5e`), `glow_gold` (`#fbbf24`), `glow_specular` (`#e0f2fe`).
+- **Typography**: `text` (`#f8fafc`), `text_muted` (`#94a3b8`).
+- **Semantic Accents**: `accent` (`#6366f1`), `accent_hover` (`#818cf8`), `accent_link` (`#38bdf8`), `accent_success` (`#10b981`), `accent_warning` (`#f59e0b`), `accent_danger` (`#f43f5e`).
+- **Glossy Controls, Inputs & Bars (`DARK_QSS`)**:
+  - `QGroupBox` & `QTabBar::tab`: Top specular `border_shine` gradients (`violet -> cyan` hover tabs, `cyan -> emerald` selected tabs).
+  - `QPushButton`, `#primaryBtn`, `#successBtn`, `#dangerBtn`: 3D glossy rest gradients with shimmering hover gradients, `:focus` neon borders, and specular pressed bursts; paired with `ButtonGlowFilter`'s animated role-matched outer neon halos (`violet`, `cyan`, `green`, `magenta`, `gold`) across mouse hover, press, and `Tab` keyboard focus.
+  - `QLineEdit`, `QPlainTextEdit`, `QTextEdit`, `QSpinBox`, `QComboBox`: Dark glass gradients transitioning to violet borders/glows on `:hover` and electric cyan borders/halos on `:focus` (`Tab` / `Shift+Tab` traverses multi-line editors via `tabChangesFocus`).
+  - `QSlider`, `QProgressBar`, `QScrollBar`, `QSplitter::handle`, `QCheckBox`, `QListWidget`: Iridescent violet ➔ cyan ➔ emerald progress fills, radial orb slider handles, neon hover/drag scrollbars & splitter handles, keyboard `:focus` indicators on checkboxes/tabs/lists, and gradient list row highlights.
 - **List Density**: `QListWidget` uses `11px` font and `2px 6px` item padding so the persistent Active Reminders Queue displays 7–9+ rows simultaneously and Activity lists display ~15+ rows.
 
 ### 2.4 Shared Domain Presets

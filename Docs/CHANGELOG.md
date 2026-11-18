@@ -5,6 +5,31 @@
 
 ---
 
+## [v3.19] — Full `Tab` Element Navigation, `Ctrl+PgUp/PgDn` Tab Cycling & Power Shortcuts (2026-11-18)
+- **Full `Tab` / `Shift+Tab` Focus Navigation & Visual Rings (`src/gui.py`, `src/go_tab.py`, `src/config.py`)**:
+  - Enabled `setTabChangesFocus(True)` on `ScratchpadEditor` (`QTextEdit`) and `GoTroubleshootingTab.console` (`QPlainTextEdit`) so pressing `Tab` / `Shift+Tab` cleanly moves through multi-line editors instead of trapping keyboard navigation.
+  - Added explicit `:focus` keyboard focus rings in `DARK_QSS` for `QPushButton`, `#primaryBtn`, `#successBtn`, `#dangerBtn`, `QTabBar::tab`, `QListWidget`, and `QCheckBox::indicator`.
+  - Updated `ButtonGlowFilter` to animate keyboard-focus neon halos on `QPushButton` and `QCheckBox` when focused via `Tab` / `Shift+Tab` / shortcuts, alongside hover/focus glows for `QLineEdit`, `QSpinBox`, `QComboBox`, and `QSlider`.
+- **Tab Cycling & Productivity Shortcuts (`src/gui.py`)**:
+  - Added **`Ctrl+PgDn` / `Ctrl+PgUp`** (plus **`Ctrl+Tab` / `Ctrl+Shift+Tab`**) in `TimerRendezVousWidget.eventFilter` for wrap-around switching across Tabs `1`–`7` regardless of focused control.
+  - Added **`Ctrl+K`** (focus Quick Natural Schedule), **`Ctrl+Q`** (focus Active Reminders Queue), **`Ctrl+P` / `Ctrl+Space`** (pause/resume selected or active reminder), **`Ctrl+E`** (inline edit selected/active item), **`Ctrl+H`** (toggle Floating Mini HUD), **`Ctrl+S`** (context-aware save on Tab 7 Settings / inline edit / Go export without colliding with Scratchpad export), **`F5`** on Tab 5 (`Go` quick Ping), **`Delete` / `Enter`** in Queue & Activity lists, **`Enter`** on focused buttons, smart **`Escape`** (closes open Scratchpad Find Bars first before returning focus to `tabBar()`), and **`F1` / `?`** opening the **Keyboard Shortcuts Quick Reference** dialog.
+
+---
+
+## [v3.18] — Cyber-Aurora Neon Glass Visual Overhaul & Animated Transitions (2026-11-18)
+- **Cyber-Aurora Palette & Full Neon QSS (`src/config.py`)**:
+  - Updated `COLORS` (`#0c0d16` cosmic obsidian, `#141625` / `#1e2238` glass surfaces, `border_shine`, `glow_magenta`, `glow_gold`, `glow_specular`).
+  - Upgraded `DARK_QSS` across all controls: 3D glossy buttons (`QPushButton`, `#primaryBtn`, `#successBtn`, `#dangerBtn`), glossy tabs, dark-glass inputs (`QLineEdit`, `QSpinBox`, `QComboBox`, `QTextEdit`, `QPlainTextEdit`) with violet `:hover` and cyan `:focus` borders, iridescent violet ➔ cyan ➔ emerald `QSlider`s with radial orb handles, neon `QProgressBar`, custom gradient `QScrollBar`s & `QSplitter` handles, neon `QCheckBox` indicators, and gradient-highlighted `QListWidget` rows.
+- **Animated Halos & Tab Shimmer Transitions (`src/gui.py`)**:
+  - Upgraded `ButtonGlowFilter(QObject)` with `QVariantAnimation` (`150ms OutCubic`) animating role-matched `QGraphicsDropShadowEffect` halos on hover, focus, and press across buttons, text inputs, spinboxes, dropdowns, and sliders.
+  - Added `TabTransitionOverlay(QWidget)` rendering a smooth 150ms Cyber-Aurora glass shimmer fade whenever switching module tabs without interfering with child drop-shadow effects.
+  - Applied glossy glass gradients and neon hover/pressed states to `hero_deck_frame`, `scratchpad_top_frame`, `btn_meeting_mode`, and `tab_go.progress_bar`.
+- **Glowing Radial Ring, Calendar, Time Picker & Floating Overlays (`src/circular_ring.py`, `src/calendar_widget.py`, `src/time_picker.py`, `src/mini_hud.py`, `src/alarm_dialog.py`)**:
+  - Enhanced `CircularProgressRing` with an inner radial-gradient glass dial, layered outer neon halo strokes, multi-stop gradient arc, and glowing white-cored leading tip orb.
+  - Applied Cyber-Aurora glass gradients and neon hover/selected states to `MiniCalendar` day cells, `BigButtonsTimePicker` digital readout and chips, `FloatingMiniHUD`, and `AlarmDialog` notification cards.
+
+---
+
 ## [v3.17] — Fixed Tabs Bar Placement Across All 7 Tabs (`top_deck_stack`) (2026-11-18)
 - **Uniform Tabs Bar Vertical Position (`src/gui.py`, `src/go_tab.py`)**:
   - Replaced collapsing `hero_deck_frame` visibility toggling with a fixed-height `QStackedWidget` (`self.top_deck_stack`, locked to Hero Deck height `161px`) positioned above `self.main_tabs` so the tabs bar remains at the exact same Y coordinate (`198px`) across all 7 tabs (`1`–`7`).
