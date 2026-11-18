@@ -126,17 +126,18 @@ class GoTroubleshootingTab(QWidget):
         layout.setContentsMargins(6, 4, 6, 4)
         layout.setSpacing(4)
 
-        # Top Configuration Group (Mode + Build + Target/Presets + 2x4 Action Grid + Dual CLI Launchers)
-        cfg_group = QGroupBox("⚡ Go Diagnostic & Remediation Engine")
-        cfg_layout = QVBoxLayout(cfg_group)
-        cfg_layout.setContentsMargins(6, 5, 6, 5)
-        cfg_layout.setSpacing(4)
+        # Top Configuration Group (Mode + Build + Target/Presets + 2x4 Action Grid; hoisted above tabs bar)
+        self.cfg_group = QGroupBox("⚡ Go Diagnostic & Remediation Engine")
+        cfg_layout = QVBoxLayout(self.cfg_group)
+        cfg_layout.setContentsMargins(6, 3, 6, 3)
+        cfg_layout.setSpacing(3)
 
         mode_row = QHBoxLayout()
         mode_row.setSpacing(4)
-        mode_row.addWidget(QLabel("Mode:"))
+        mode_row.addWidget(QLabel("Engine:"))
         self.combo_mode = QComboBox()
         self.combo_mode.setMinimumWidth(0)
+        self.combo_mode.setFixedHeight(22)
         self.combo_mode.addItem("Compiled Binary (Zero-Dep)", "binary")
         self.combo_mode.addItem("Go Script (go run)", "go_run")
         mode_row.addWidget(self.combo_mode, 1)
@@ -146,11 +147,41 @@ class GoTroubleshootingTab(QWidget):
         mode_row.addWidget(self.lbl_engine_status)
 
         self.btn_build_bins = QPushButton("🔨")
-        self.btn_build_bins.setFixedHeight(23)
+        self.btn_build_bins.setFixedSize(26, 22)
         self.btn_build_bins.setToolTip("Cross-compile Go binaries into /bin via go_engine/build_all.ps1")
         self.btn_build_bins.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_build_bins.clicked.connect(self.build_go_binaries)
         mode_row.addWidget(self.btn_build_bins)
+
+        self.elevate_checkbox = QCheckBox("Admin")
+        self.elevate_checkbox.setVisible(False)
+        self.elevate_checkbox.toggled.connect(self._on_elevate_toggled)
+
+        self.btn_admin_cli = QPushButton("🛡️ Admin Go CLI")
+        self.btn_admin_cli.setMinimumWidth(0)
+        self.btn_admin_cli.setFixedHeight(22)
+        self.btn_admin_cli.setToolTip("Launch Elevated Admin Go CLI (UAC / sudo) for OS Network Repairs & Firewall Audits")
+        self.btn_admin_cli.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_admin_cli.setStyleSheet(
+            f"QPushButton {{ background-color: {COLORS['surface_light']}; color: {COLORS['accent_warning']}; "
+            f"border: 1px solid {COLORS['accent_warning']}; border-radius: 4px; font-weight: bold; padding: 2px 6px; font-size: 11px; }}"
+            f"QPushButton:hover {{ background-color: {COLORS['accent_warning']}; color: #111116; }}"
+        )
+        self.btn_admin_cli.clicked.connect(lambda _c=False: self.launch_interactive_go_cli(elevate_override=True))
+        mode_row.addWidget(self.btn_admin_cli)
+
+        self.btn_std_cli = QPushButton("🚀 Standard Go CLI")
+        self.btn_std_cli.setObjectName("primaryBtn")
+        self.btn_std_cli.setMinimumWidth(0)
+        self.btn_std_cli.setFixedHeight(22)
+        self.btn_std_cli.setStyleSheet("padding: 2px 6px; font-size: 11px;")
+        self.btn_std_cli.setToolTip("Launch Standard Non-Elevated Go CLI for User-Space Diagnostics")
+        self.btn_std_cli.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_std_cli.clicked.connect(lambda _c=False: self.launch_interactive_go_cli(elevate_override=False))
+        mode_row.addWidget(self.btn_std_cli)
+
+        # Backward-compatible alias
+        self.launch_cli_btn = self.btn_std_cli
         cfg_layout.addLayout(mode_row)
 
         target_row = QHBoxLayout()
@@ -158,18 +189,19 @@ class GoTroubleshootingTab(QWidget):
         target_row.addWidget(QLabel("Target:"))
         self.entry_target = QLineEdit("1.1.1.1")
         self.entry_target.setMinimumWidth(0)
+        self.entry_target.setFixedHeight(22)
         self.entry_target.setPlaceholderText("IP, hostname, or URL")
         target_row.addWidget(self.entry_target, 2)
 
         self.combo_presets = QComboBox()
         self.combo_presets.setMinimumWidth(0)
+        self.combo_presets.setFixedHeight(22)
         self.combo_presets.setToolTip("Quick-select saved custom target bookmarks (⭐) or built-in targets")
         self.combo_presets.currentIndexChanged.connect(self._on_preset_selected)
         target_row.addWidget(self.combo_presets, 2)
 
         self.btn_save_target = QPushButton("⭐")
-        self.btn_save_target.setFixedWidth(28)
-        self.btn_save_target.setFixedHeight(23)
+        self.btn_save_target.setFixedSize(26, 22)
         self.btn_save_target.setToolTip("Bookmark current Target host/IP into saved presets")
         self.btn_save_target.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_save_target.clicked.connect(self.save_current_target_bookmark)
@@ -177,8 +209,7 @@ class GoTroubleshootingTab(QWidget):
 
         self.btn_delete_target = QPushButton("✕")
         self.btn_delete_target.setObjectName("dangerBtn")
-        self.btn_delete_target.setFixedWidth(26)
-        self.btn_delete_target.setFixedHeight(23)
+        self.btn_delete_target.setFixedSize(24, 22)
         self.btn_delete_target.setToolTip("Remove current Target from saved custom bookmarks")
         self.btn_delete_target.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_delete_target.clicked.connect(self.remove_current_target_bookmark)
@@ -189,19 +220,20 @@ class GoTroubleshootingTab(QWidget):
         target_row.addWidget(QLabel("Args:"))
         self.entry_extra_args = QLineEdit()
         self.entry_extra_args.setMinimumWidth(0)
+        self.entry_extra_args.setFixedHeight(22)
         self.entry_extra_args.setPlaceholderText("Flags")
         target_row.addWidget(self.entry_extra_args, 1)
         cfg_layout.addLayout(target_row)
 
         # 8 Action Buttons Grid (2 rows x 4 columns)
         grid = QGridLayout()
-        grid.setSpacing(4)
+        grid.setSpacing(3)
         for idx, (label, action_slug) in enumerate(GO_DIAG_ACTIONS):
             btn = QPushButton(label)
             btn.setMinimumWidth(0)
-            btn.setMinimumHeight(24)
+            btn.setFixedHeight(23)
             btn.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
-            btn.setStyleSheet("padding: 2px 4px; font-size: 11px;")
+            btn.setStyleSheet("padding: 1px 4px; font-size: 11px;")
             btn.setCursor(Qt.CursorShape.PointingHandCursor)
             btn.clicked.connect(lambda _c=False, a=action_slug: self.run_diagnostic(a))
             row, col = divmod(idx, 4)
@@ -209,42 +241,7 @@ class GoTroubleshootingTab(QWidget):
             self._action_buttons.append(btn)
         cfg_layout.addLayout(grid)
 
-        # Dedicated Dual Interactive Go CLI Launchers: Admin Go CLI vs Standard Go CLI
-        cli_launcher_layout = QHBoxLayout()
-        cli_launcher_layout.setSpacing(6)
-
-        self.elevate_checkbox = QCheckBox("Admin")
-        self.elevate_checkbox.setVisible(False)
-        self.elevate_checkbox.toggled.connect(self._on_elevate_toggled)
-
-        self.btn_admin_cli = QPushButton("🛡️ Admin Go CLI")
-        self.btn_admin_cli.setMinimumWidth(0)
-        self.btn_admin_cli.setMinimumHeight(26)
-        self.btn_admin_cli.setToolTip("Launch Elevated Admin Go CLI (UAC / sudo) for OS Network Repairs & Firewall Audits")
-        self.btn_admin_cli.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.btn_admin_cli.setStyleSheet(
-            f"QPushButton {{ background-color: {COLORS['surface_light']}; color: {COLORS['accent_warning']}; "
-            f"border: 1px solid {COLORS['accent_warning']}; border-radius: 4px; font-weight: bold; padding: 3px 8px; }}"
-            f"QPushButton:hover {{ background-color: {COLORS['accent_warning']}; color: #111116; }}"
-        )
-        self.btn_admin_cli.clicked.connect(lambda _c=False: self.launch_interactive_go_cli(elevate_override=True))
-
-        self.btn_std_cli = QPushButton("🚀 Standard Go CLI")
-        self.btn_std_cli.setObjectName("primaryBtn")
-        self.btn_std_cli.setMinimumWidth(0)
-        self.btn_std_cli.setMinimumHeight(26)
-        self.btn_std_cli.setToolTip("Launch Standard Non-Elevated Go CLI for User-Space Diagnostics")
-        self.btn_std_cli.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.btn_std_cli.clicked.connect(lambda _c=False: self.launch_interactive_go_cli(elevate_override=False))
-
-        # Backward-compatible alias
-        self.launch_cli_btn = self.btn_std_cli
-
-        cli_launcher_layout.addWidget(self.btn_admin_cli, 1)
-        cli_launcher_layout.addWidget(self.btn_std_cli, 1)
-        cfg_layout.addLayout(cli_launcher_layout)
-
-        layout.addWidget(cfg_group)
+        layout.addWidget(self.cfg_group)
 
         # Process Controls, Copy / Send to Scratchpad & Indeterminate Progress Bar Row
         ctrl_row = QHBoxLayout()

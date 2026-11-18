@@ -47,6 +47,7 @@ from PySide6.QtWidgets import (
     QMenu,
     QColorDialog,
     QSplitter,
+    QStackedWidget,
     QSizePolicy,
     QGraphicsDropShadowEffect,
 )
@@ -759,6 +760,7 @@ class TimerRendezVousWidget(QWidget):
         parent_layout.addLayout(hdr)
 
     def _build_hero_deck(self, parent_layout: QVBoxLayout) -> None:
+        self.top_deck_stack = QStackedWidget(self)
         self.hero_deck_frame = QFrame()
         self.hero_deck_frame.setStyleSheet(
             f"QFrame {{ background-color: {COLORS['surface']}; border: 1px solid {COLORS['border']}; border-radius: 6px; }}"
@@ -838,7 +840,8 @@ class TimerRendezVousWidget(QWidget):
         right_col.addStretch()
 
         deck_layout.addLayout(right_col, 1)
-        parent_layout.addWidget(self.hero_deck_frame)
+        self.top_deck_stack.addWidget(self.hero_deck_frame)
+        parent_layout.addWidget(self.top_deck_stack)
 
     def _build_tabs(self, parent_layout: QVBoxLayout) -> None:
         self.main_tabs = QTabWidget()
@@ -868,6 +871,12 @@ class TimerRendezVousWidget(QWidget):
         self._init_history_tab(self.tab_history)
         self._init_settings_tab(self.tab_settings)
 
+        self.top_deck_stack.addWidget(self.scratchpad_top_frame)
+        self.top_deck_stack.addWidget(self.tab_go.cfg_group)
+        self.top_deck_stack.addWidget(self.settings_top_frame)
+        deck_h = max(161, self.hero_deck_frame.sizeHint().height())
+        self.top_deck_stack.setFixedHeight(deck_h)
+
         self.tab_go.sendToScratchpad.connect(self._append_to_scratchpad)
         self.tab_go.diagnostic_completed.connect(self._on_go_diagnostic_completed)
         self.tab_go.customTargetsChanged.connect(self._on_custom_go_targets_changed)
@@ -876,12 +885,18 @@ class TimerRendezVousWidget(QWidget):
         parent_layout.addWidget(self.main_tabs, 5)
 
     def _on_main_tab_changed(self, index: int) -> None:
-        """Dynamically hide/show the top Hero Deck and bottom Active Reminders Queue per section."""
+        """Keep tabs bar height uniform across all 7 tabs via top_deck_stack and manage queue visibility."""
         current_tab = self.main_tabs.widget(index)
-        # Hide top Hero Deck on 4. Scratchpad, 5. Go, and 7. Settings
-        if hasattr(self, "hero_deck_frame"):
-            hide_hero = current_tab in (self.tab_scratchpad, self.tab_go, self.tab_settings)
-            self.hero_deck_frame.setVisible(not hide_hero)
+        if hasattr(self, "top_deck_stack"):
+            if current_tab == self.tab_scratchpad and hasattr(self, "scratchpad_top_frame"):
+                self.top_deck_stack.setCurrentWidget(self.scratchpad_top_frame)
+            elif current_tab == self.tab_go and hasattr(self, "tab_go") and hasattr(self.tab_go, "cfg_group"):
+                self.top_deck_stack.setCurrentWidget(self.tab_go.cfg_group)
+            elif current_tab == self.tab_settings and hasattr(self, "settings_top_frame"):
+                self.top_deck_stack.setCurrentWidget(self.settings_top_frame)
+            else:
+                self.top_deck_stack.setCurrentWidget(self.hero_deck_frame)
+
         # Hide bottom Active Reminders Queue on 3. Activity, 4. Scratchpad, 5. Go, and 6. History
         if hasattr(self, "active_queue_group"):
             hide_queue = current_tab in (
@@ -892,8 +907,8 @@ class TimerRendezVousWidget(QWidget):
             )
             self.active_queue_group.setVisible(not hide_queue)
 
-        # Give remaining vertical space on Timers & RDV tabs to Active Reminders Queue
-        if current_tab in (self.tab_timers, self.tab_rdv):
+        # Give remaining vertical space on Timers, RDV, and Settings tabs to Active Reminders Queue
+        if current_tab in (self.tab_timers, self.tab_rdv, self.tab_settings):
             tab_bar_h = self.main_tabs.tabBar().sizeHint().height()
             page_h = current_tab.sizeHint().height()
             self.main_tabs.setMaximumHeight(tab_bar_h + page_h + 10)
@@ -1392,33 +1407,40 @@ class TimerRendezVousWidget(QWidget):
         r_layout.addLayout(r_detail_row)
         layout.addWidget(r_group, 1)
 
-    # ── Tab 4: Dual Upper & Lower Rich-Text Scratchpads + Tab 5 Go Scratchpad ──
+    # ── Tab 4: Dual Upper (Over Tabs) & Lower Rich-Text Scratchpads + Tab 5 Go Scratchpad ──
 
     def _init_scratchpad_tab(self, parent: QWidget) -> None:
         layout = QVBoxLayout(parent)
         layout.setContentsMargins(6, 4, 6, 4)
         layout.setSpacing(4)
 
-        self.scratchpad_splitter = QSplitter(Qt.Orientation.Vertical)
-        self.scratchpad_splitter.setChildrenCollapsible(False)
+        self.scratchpad_top_frame = QFrame(self)
+        self.scratchpad_top_frame.setStyleSheet(
+            f"QFrame {{ background-color: {COLORS['surface']}; border: 1px solid {COLORS['border']}; border-radius: 6px; }}"
+        )
+        top_sp_layout = QVBoxLayout(self.scratchpad_top_frame)
+        top_sp_layout.setContentsMargins(6, 3, 6, 3)
+        top_sp_layout.setSpacing(2)
 
         self.upper_scratchpad_pane = RichScratchpadPane(
             title="📝 Scratchpad 1 (Upper)",
             placeholder="Upper Scratchpad: Pin priority notes, commands, client numbers, or clickable URLs...",
             initial_text=self.scratchpad_state.upper_content,
             initial_html=self.scratchpad_state.upper_html,
-            parent=self,
+            parent=self.scratchpad_top_frame,
         )
+        self.upper_scratchpad_pane.editor.setMinimumHeight(40)
         self.upper_scratchpad_text = self.upper_scratchpad_pane.editor
         self.upper_scratchpad_pane.contentModified.connect(self._on_scratchpad_modified)
         self.upper_scratchpad_pane.scheduleRequested.connect(self._on_scratchpad_schedule_requested)
+        top_sp_layout.addWidget(self.upper_scratchpad_pane, 1)
 
         self.lower_scratchpad_pane = RichScratchpadPane(
             title="📝 Scratchpad 2 (Lower)",
             placeholder="Lower Scratchpad: Jot down time notes, ticket updates, or clickable URLs...",
             initial_text=self.scratchpad_state.content,
             initial_html=self.scratchpad_state.html,
-            parent=self,
+            parent=parent,
         )
         # Backward-compatible attribute aliases for lower scratchpad
         self.scratchpad_text = self.lower_scratchpad_pane.editor
@@ -1428,12 +1450,7 @@ class TimerRendezVousWidget(QWidget):
         self.lower_scratchpad_pane.contentModified.connect(self._on_scratchpad_modified)
         self.lower_scratchpad_pane.scheduleRequested.connect(self._on_scratchpad_schedule_requested)
 
-        self.scratchpad_splitter.addWidget(self.upper_scratchpad_pane)
-        self.scratchpad_splitter.addWidget(self.lower_scratchpad_pane)
-        self.scratchpad_splitter.setStretchFactor(0, 1)
-        self.scratchpad_splitter.setStretchFactor(1, 1)
-
-        layout.addWidget(self.scratchpad_splitter, 1)
+        layout.addWidget(self.lower_scratchpad_pane, 1)
 
     def _init_go_scratchpad(self) -> None:
         """Create and attach the 3rd rich-text Scratchpad inside Tab 5 ('5. Go ⏱️')."""
@@ -1519,99 +1536,119 @@ class TimerRendezVousWidget(QWidget):
         layout.addWidget(h_group, 1)
         self._load_history_list()
 
-    # ── Tab 7: Settings (No Top Timer + App Transparency Slider + Compact Emoji Controls) ──
+    # ── Tab 7: Settings (Sound & Transparency Hoisted Above Tabs Bar; Meeting Mode & AHK Below) ──
 
     def _init_settings_tab(self, parent: QWidget) -> None:
         layout = QVBoxLayout(parent)
-        layout.setContentsMargins(6, 5, 6, 5)
-        layout.setSpacing(6)
+        layout.setContentsMargins(6, 4, 6, 4)
+        layout.setSpacing(4)
 
-        s_group = QGroupBox("🔊 Sound, Transparency & System Preferences")
-        s_layout = QVBoxLayout(s_group)
-        s_layout.setContentsMargins(6, 6, 6, 6)
-        s_layout.setSpacing(6)
+        self.settings_top_frame = QGroupBox("🔊 Sound, Transparency & System Preferences")
+        s_layout = QVBoxLayout(self.settings_top_frame)
+        s_layout.setContentsMargins(6, 3, 6, 3)
+        s_layout.setSpacing(3)
 
-        # Sound preset + preview
+        # Row 1: Alarm tone + preview + custom audio file browse
         row_tone = QHBoxLayout()
         row_tone.setSpacing(4)
-        row_tone.addWidget(QLabel("Alarm Tone:"))
+        row_tone.addWidget(QLabel("Tone:"))
         self.combo_sound = QComboBox()
         self.combo_sound.setMinimumWidth(0)
+        self.combo_sound.setFixedHeight(22)
         for key, label in SOUND_PRESETS.items():
             self.combo_sound.addItem(f"{key} — {label}", key)
         idx = self.combo_sound.findData(self.app_config.sound_type)
         if idx >= 0:
             self.combo_sound.setCurrentIndex(idx)
-        row_tone.addWidget(self.combo_sound, 1)
+        row_tone.addWidget(self.combo_sound, 2)
 
         self.btn_preview = QPushButton("🔊")
-        self.btn_preview.setFixedWidth(36)
+        self.btn_preview.setFixedSize(32, 22)
         self.btn_preview.setToolTip("Preview alarm tone")
         self.btn_preview.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_preview.clicked.connect(self._toggle_preview)
         row_tone.addWidget(self.btn_preview)
+
+        row_tone.addWidget(QLabel("File:"))
+        self.lbl_sound_path = QLabel(self.app_config.custom_sound_path or "No file chosen")
+        self.lbl_sound_path.setMinimumWidth(0)
+        self.lbl_sound_path.setFixedHeight(22)
+        self.lbl_sound_path.setStyleSheet(
+            f"background-color: {COLORS['surface_light']}; color: {COLORS['text_muted']}; padding: 2px 6px; border-radius: 4px;"
+        )
+        row_tone.addWidget(self.lbl_sound_path, 2)
+
+        btn_browse = QPushButton("📂")
+        btn_browse.setFixedSize(32, 22)
+        btn_browse.setToolTip("Browse custom audio file (.mp3 / .wav)")
+        btn_browse.setCursor(Qt.CursorShape.PointingHandCursor)
+        btn_browse.clicked.connect(self._browse_audio)
+        row_tone.addWidget(btn_browse)
         s_layout.addLayout(row_tone)
 
-        # Master Volume slider
-        row_vol = QHBoxLayout()
+        # Row 2: Master Volume + App Transparency side-by-side
+        row_vol_app = QHBoxLayout()
+        row_vol_app.setSpacing(6)
         self.lbl_volume = QLabel(f"Master Volume: {self.app_config.volume}%")
-        self.lbl_volume.setFixedWidth(155)
-        row_vol.addWidget(self.lbl_volume)
+        self.lbl_volume.setFixedWidth(130)
+        row_vol_app.addWidget(self.lbl_volume)
 
         self.slider_volume = QSlider(Qt.Orientation.Horizontal)
         self.slider_volume.setRange(0, 100)
         self.slider_volume.setValue(self.app_config.volume)
         self.slider_volume.valueChanged.connect(lambda v: self.lbl_volume.setText(f"Master Volume: {v}%"))
-        row_vol.addWidget(self.slider_volume, 1)
-        s_layout.addLayout(row_vol)
+        row_vol_app.addWidget(self.slider_volume, 1)
 
-        # Default App Window Transparency Slider (45% to 100%, default 90%, synced with Top Header Slider)
-        row_app_opacity = QHBoxLayout()
         self.lbl_app_opacity = QLabel(f"App Transparency: {self.app_config.app_opacity}%")
-        self.lbl_app_opacity.setFixedWidth(155)
-        row_app_opacity.addWidget(self.lbl_app_opacity)
+        self.lbl_app_opacity.setFixedWidth(145)
+        row_vol_app.addWidget(self.lbl_app_opacity)
 
         self.slider_app_opacity = QSlider(Qt.Orientation.Horizontal)
         self.slider_app_opacity.setRange(45, 100)
         self.slider_app_opacity.setValue(self.app_config.app_opacity)
         self.slider_app_opacity.valueChanged.connect(self._on_app_opacity_changed)
-        row_app_opacity.addWidget(self.slider_app_opacity, 1)
-        s_layout.addLayout(row_app_opacity)
+        row_vol_app.addWidget(self.slider_app_opacity, 1)
+        s_layout.addLayout(row_vol_app)
 
-        # Popup & Mini HUD Opacity slider (60% to 100%, default 90%)
-        row_opacity = QHBoxLayout()
+        # Row 3: Popup & HUD Opacity + Snooze + Save
+        row_hud_snooze = QHBoxLayout()
+        row_hud_snooze.setSpacing(6)
         self.lbl_opacity = QLabel(f"Popup & HUD Opacity: {self.app_config.overlay_opacity}%")
-        self.lbl_opacity.setFixedWidth(155)
-        row_opacity.addWidget(self.lbl_opacity)
+        self.lbl_opacity.setFixedWidth(150)
+        row_hud_snooze.addWidget(self.lbl_opacity)
 
         self.slider_opacity = QSlider(Qt.Orientation.Horizontal)
         self.slider_opacity.setRange(60, 100)
         self.slider_opacity.setValue(self.app_config.overlay_opacity)
         self.slider_opacity.valueChanged.connect(self._on_opacity_slider_changed)
-        row_opacity.addWidget(self.slider_opacity, 1)
-        s_layout.addLayout(row_opacity)
+        row_hud_snooze.addWidget(self.slider_opacity, 1)
 
-        # Custom audio file
-        row_file = QHBoxLayout()
-        row_file.setSpacing(4)
-        row_file.addWidget(QLabel("Audio File:"))
-        self.lbl_sound_path = QLabel(self.app_config.custom_sound_path or "No file chosen")
-        self.lbl_sound_path.setMinimumWidth(0)
-        self.lbl_sound_path.setStyleSheet(
-            f"background-color: {COLORS['surface_light']}; color: {COLORS['text_muted']}; padding: 3px 6px; border-radius: 4px;"
-        )
-        row_file.addWidget(self.lbl_sound_path, 1)
+        row_hud_snooze.addWidget(QLabel("Snooze:"))
+        self.combo_snooze = QComboBox()
+        self.combo_snooze.setFixedHeight(22)
+        for opt in SNOOZE_OPTIONS:
+            self.combo_snooze.addItem(f"{opt}m", opt)
+        s_idx = self.combo_snooze.findData(self.app_config.default_snooze_minutes)
+        if s_idx >= 0:
+            self.combo_snooze.setCurrentIndex(s_idx)
+        row_hud_snooze.addWidget(self.combo_snooze)
 
-        btn_browse = QPushButton("📂")
-        btn_browse.setFixedWidth(36)
-        btn_browse.setToolTip("Browse custom audio file (.mp3 / .wav)")
-        btn_browse.setCursor(Qt.CursorShape.PointingHandCursor)
-        btn_browse.clicked.connect(self._browse_audio)
-        row_file.addWidget(btn_browse)
-        s_layout.addLayout(row_file)
+        self.lbl_settings_saved = QLabel("")
+        self.lbl_settings_saved.setStyleSheet(f"color: {COLORS['accent_success']}; font-weight: bold;")
+        row_hud_snooze.addWidget(self.lbl_settings_saved)
 
-        # Checkboxes & Snooze
+        btn_save = QPushButton("💾")
+        btn_save.setObjectName("successBtn")
+        btn_save.setFixedSize(36, 22)
+        btn_save.setToolTip("Save settings")
+        btn_save.setCursor(Qt.CursorShape.PointingHandCursor)
+        btn_save.clicked.connect(self._save_settings)
+        row_hud_snooze.addWidget(btn_save)
+        s_layout.addLayout(row_hud_snooze)
+
+        # Row 4: Checkboxes
         row_opts = QHBoxLayout()
+        row_opts.setSpacing(8)
         self.chk_escalate = QCheckBox("Gradual volume escalation")
         self.chk_escalate.setChecked(self.app_config.gradual_escalation)
         row_opts.addWidget(self.chk_escalate)
@@ -1621,33 +1658,6 @@ class TimerRendezVousWidget(QWidget):
         row_opts.addWidget(self.chk_startup)
         row_opts.addStretch()
         s_layout.addLayout(row_opts)
-
-        row_bottom = QHBoxLayout()
-        row_bottom.setSpacing(4)
-        row_bottom.addWidget(QLabel("Snooze:"))
-        self.combo_snooze = QComboBox()
-        for opt in SNOOZE_OPTIONS:
-            self.combo_snooze.addItem(f"{opt}m", opt)
-        s_idx = self.combo_snooze.findData(self.app_config.default_snooze_minutes)
-        if s_idx >= 0:
-            self.combo_snooze.setCurrentIndex(s_idx)
-        row_bottom.addWidget(self.combo_snooze)
-
-        self.lbl_settings_saved = QLabel("")
-        self.lbl_settings_saved.setStyleSheet(f"color: {COLORS['accent_success']}; font-weight: bold;")
-        row_bottom.addWidget(self.lbl_settings_saved)
-        row_bottom.addStretch()
-
-        btn_save = QPushButton("💾")
-        btn_save.setObjectName("successBtn")
-        btn_save.setFixedWidth(40)
-        btn_save.setToolTip("Save settings")
-        btn_save.setCursor(Qt.CursorShape.PointingHandCursor)
-        btn_save.clicked.connect(self._save_settings)
-        row_bottom.addWidget(btn_save)
-        s_layout.addLayout(row_bottom)
-
-        layout.addWidget(s_group)
 
         # ── Group 2: Discreet & Meeting Mode ──
         meeting_group = QGroupBox("🤫 Discreet & Meeting Mode")

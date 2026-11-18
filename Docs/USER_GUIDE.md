@@ -5,11 +5,16 @@
 
 ---
 
-## 1. Header & Hero Deck (Top Section)
+## 1. Header & Fixed-Height Top Deck
 
+- **Uniform Tabs Bar Placement**: The top deck stays at a fixed height above the `1`–`7` tabs bar across every section so the tabs bar never shifts up or down when switching tabs:
+  - **Tabs `1`, `2`, `3`, `6`**: Displays the **Hero Deck** (Radial Countdown Ring + Quick Natural Schedule).
+  - **Tab `4. Scratchpad 📝`**: Displays **`📝 Scratchpad 1 (Upper)`** above the tabs bar and **`📝 Scratchpad 2 (Lower)`** below.
+  - **Tab `5. Go ⏱️`**: Displays the compact **`⚡ Go Diagnostic & Remediation Engine`** controls and action buttons above the tabs bar.
+  - **Tab `7. Settings ⚙️`**: Displays the compact **`🔊 Sound, Transparency & System Preferences`** controls above the tabs bar.
 - **Neon Button Glow**: Every button glows with a violet ➔ cyan gradient while hovered and flashes a cyan ➔ green gradient while clicked. The 7 tab buttons use the same gradients (violet ➔ cyan on hover, cyan ➔ green for the active tab).
 - **Header Bar**: Displays the application title, keyboard shortcut hint (`Ctrl+F8 | Keys 1-7`), the **`🔔 Normal` / `🤫 Meeting` Mode button** (left-click to toggle, right-click for timed mutes, `Ctrl+Shift+M`), the **App Window Opacity Slider (`🔆 45%–100%`, default `90%`)** immediately on the left of the **`📌 HUD`** button, and the **`📌 HUD`** toggle button.
-- **Left — ⭕ Radial Circular Progress Ring** *(visible on Tabs 1, 2, 3, and 6; hidden on Tabs 4, 5, and 7 for maximum vertical workspace)*:
+- **Left — ⭕ Radial Circular Progress Ring** *(visible above tabs bar on Tabs 1, 2, 3, and 6)*:
   - Smoothly depletes clockwise for your active timer (or nearest upcoming Rendez-vous when no timer is active).
   - **Urgency Colors**: Indigo (`>25%` remaining) ➔ Amber (`<25%`) ➔ Crimson Red (`<10%`), with inline `⏸ PAUSED` and `🔁 Repeat` status badges.
   - **`⏸️` / `▶️`** & **`⏹️`**: Compact emoji controls to directly pause/resume or cancel the active countdown.
@@ -53,10 +58,10 @@
 - Automatically hides the bottom `Active Reminders Queue` so **`⏳ All Timers`** and **`📅 All Rendez-vous`** expand to 100% of the vertical space.
 - Double-click any timer or RDV (or click **`✏️`**) to jump straight into inline edit mode, or use **`⏸️`**, **`🗑️`**, and **`🔗`**.
 
-### Tab 4 — `4. Scratchpad 📝` (Dual Upper & Lower Rich-Text Scratchpads + Power Tools)
-- Automatically hides both the top Hero Deck and the bottom `Active Reminders Queue`, providing a vertical `QSplitter` with **two independent rich-text Scratchpads**:
-  1. **`📝 Scratchpad 1 (Upper)`**: Pin priority notes, commands, client numbers, or URLs at the top.
-  2. **`📝 Scratchpad 2 (Lower)`**: Jot down ongoing time notes, call logs, or diagnostic snippets below.
+### Tab 4 — `4. Scratchpad 📝` (Upper Over-Tabs & Lower Rich-Text Scratchpads + Power Tools)
+- Hides the bottom `Active Reminders Queue` and splits the two rich-text scratchpads across the fixed tabs bar:
+  1. **`📝 Scratchpad 1 (Upper)`** *(above the tabs bar)*: Pin priority notes, commands, client numbers, or URLs in the top deck.
+  2. **`📝 Scratchpad 2 (Lower)`** *(below the tabs bar)*: Expands full-height for ongoing time notes, call logs, or diagnostic snippets.
 - Each Scratchpad (including the 3rd Scratchpad in `5. Go ⏱️`) features a compact power toolbar:
   - **`𝐁`** (`Ctrl+B`): Toggle Bold on highlighted text.
   - **`🎨`**: Apply foreground colors from the 8-color dark palette or custom color picker.
@@ -92,7 +97,7 @@
     - Directly launches the elevated Administrator / `sudo` remediation & deep audit REPL (`[1] Flush DNS`, `[2] Clear ARP/NetBIOS`, `[3] Restart DNS Client`, `[4] Reset Winsock`, `[5] Reset TCP/IP Stack`, `[6] Elevated Port & Process Owner Audit`, `[7] Firewall Profiles Audit`, `[8] Routing Table Audit`, `[9] Automated Admin Playbook`).
   - **Shared REPL Commands (`Multi-Select`, `Ranges`, `bm`, `copy`, `save`, `clr`, `target`, `exit`)**: Both CLIs support multiple numbers (`1,3,4`), number ranges (`1-4, 6`), `target <host>`, `bm` (`bm` to list saved bookmarks, `bm <n>` to switch target to bookmark `#n`, `bm add [label]` to bookmark current target, `bm del <n>` to delete), `copy` (or `cp`) to clipboard, `save [md|txt|json]` (or `export`) into `C:\Temp`, `clr`, and `exit`.
 - **Live Console + 3rd Rich-Text Go Scratchpad**:
-  - Automatically hides both the top Hero Deck and the bottom `Active Reminders Queue` on **`5. Go ⏱️`**.
+  - Hosts the compact **Engine, Target/Bookmarks, `2×4` Action Grid, and Dual CLI Launchers** in the fixed top deck above the tabs bar, and hides the bottom `Active Reminders Queue` so the Live Console + Go Scratchpad fill the tab area below.
   - Beneath the live color-highlighted console (`📋` Copy, `📝` +Scratchpad, `💾` Export, `⏹️` Stop, `🧹` Clear), a vertical `QSplitter` hosts the **3rd Rich-Text Scratchpad** (`📝 Go Scratchpad`) with Bold (`𝐁`), Color (`🎨`), Timestamp (`🕒`), Find (`🔍` `Ctrl+F`), Schedule Selection (`⏰`), Export (`💾` `Ctrl+S`), Copy (`📋`), Clear (`🧹`), and clickable URLs.
 
 ### Tab 6 — `6. History 📜` (Completed & Triggered Log)
@@ -100,7 +105,7 @@
 - Press the **`Delete`** key (or click **`🗑️`**) to remove selected individual history entries, or use **`🔗`** (Open Link), **`📋`** (Copy Selected), and **`🧹`** (Clear All History).
 
 ### Tab 7 — `7. Settings ⚙️` (Audio, Transparency, System Preferences & AHK v2 Expanders)
-- Automatically hides the top Hero Deck to provide extra vertical room for settings.
+- Hosts the compact **Sound, Transparency & System Preferences** controls in the fixed top deck above the tabs bar, while **`🤫 Discreet & Meeting Mode`** and **`⌨️ AutoHotkey v2 Text Expanders`** sit below the tabs bar above the **`Active Reminders Queue`**.
 - **Alarm Tone & `🔊`**: Audition built-in synthesized patterns or click **`📂`** to browse for a custom `.mp3` / `.wav` file.
 - **Master Volume (`0–100%`)**: Hardware-scaled alarm loudness.
 - **App Transparency (`45–100%`, default `90%`)**: Controls overall TimeSpace main window opacity, synchronized live with the **`🔆` Opacity Slider** in the top header bar.

@@ -5,6 +5,15 @@
 
 ---
 
+## [v3.17] — Fixed Tabs Bar Placement Across All 7 Tabs (`top_deck_stack`) (2026-11-18)
+- **Uniform Tabs Bar Vertical Position (`src/gui.py`, `src/go_tab.py`)**:
+  - Replaced collapsing `hero_deck_frame` visibility toggling with a fixed-height `QStackedWidget` (`self.top_deck_stack`, locked to Hero Deck height `161px`) positioned above `self.main_tabs` so the tabs bar remains at the exact same Y coordinate (`198px`) across all 7 tabs (`1`–`7`).
+  - **Tab `4. Scratchpad 📝`**: Placed **`📝 Scratchpad 1 (Upper)`** (`self.scratchpad_top_frame` / `self.upper_scratchpad_pane`) inside `self.top_deck_stack` above the tabs bar, leaving **`📝 Scratchpad 2 (Lower)`** expanding full height below the tabs bar.
+  - **Tab `5. Go ⏱️`**: Rearranged `GoTroubleshootingTab.cfg_group` in `src/go_tab.py` into a compact 4-row layout (Engine/CLI launchers row, Target/Bookmarks/Args row, `2×4` action grid) and hoisted it into `self.top_deck_stack` above the tabs bar, keeping the progress bar, console controls, Live Console, and Go Scratchpad below.
+  - **Tab `7. Settings ⚙️`**: Rearranged **Sound, Transparency & System Preferences** (`self.settings_top_frame`) into a compact 4-row 2-column layout in `self.top_deck_stack` above the tabs bar, keeping **Discreet & Meeting Mode** and **AutoHotkey v2 Text Expanders** below the tabs bar alongside the expanded **Active Reminders Queue**.
+
+---
+
 ## [v3.16] — Taller Active Reminders Queue & Scroll Position Preservation (2026-11-15)
 - **Taller Active Reminders Queue on `1. Timers ⏳` & `2. RDV 📅` (`src/gui.py`, `src/calendar_widget.py`)**:
   - Updated `TimerRendezVousWidget._on_main_tab_changed()` to hug the natural content height of Tab 1 (`Timers`) and Tab 2 (`RDV`) via `main_tabs.setMaximumHeight(...)` and allocate remaining root vertical stretch (`0` vs `10`) directly to `active_queue_group`.
