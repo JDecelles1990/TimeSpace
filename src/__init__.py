@@ -30,6 +30,7 @@ from src.meeting_detector import is_microphone_in_use, get_active_microphone_app
 from src.go_tab import GoTroubleshootingTab
 from src.ahk_manager import AHKProcessManager, find_ahk_v2_exe, generate_ahk_v2_script
 from src.ahk_dialog import AHKHotstringsDialog, AHKItemEditDialog
+from src.neon_tooltip import NeonToolTip, NeonToolTipFilter
 from src.gui import TimerRendezVousWidget, TimeSpaceWidget, MainApp
 
 __all__ = [
@@ -67,6 +68,8 @@ __all__ = [
     "generate_ahk_v2_script",
     "AHKHotstringsDialog",
     "AHKItemEditDialog",
+    "NeonToolTip",
+    "NeonToolTipFilter",
     "TimerRendezVousWidget",
     "TimeSpaceWidget",
     "MainApp",

@@ -91,6 +91,7 @@ from src.ahk_manager import AHKProcessManager, find_ahk_v2_exe, generate_ahk_v2_
 from src.ahk_dialog import AHKHotstringsDialog
 from src.storage import DEFAULT_AHK_SCRIPT_FILE
 from src.meeting_detector import is_microphone_in_use, get_active_microphone_apps
+from src.neon_tooltip import NeonToolTipFilter
 
 
 _URL_TOKEN_RE = re.compile(r"(?:https?://|www\.)[^\s<>\"']+", re.IGNORECASE)
@@ -1151,6 +1152,8 @@ class TimerRendezVousWidget(QWidget):
             app.installEventFilter(self)
             self._button_glow_filter = ButtonGlowFilter(self)
             app.installEventFilter(self._button_glow_filter)
+            self._tooltip_filter = NeonToolTipFilter(self)
+            app.installEventFilter(self._tooltip_filter)
 
     def _activate_tab_shortcut(self, index: int) -> None:
         if 0 <= index < self.main_tabs.count():
@@ -3695,6 +3698,9 @@ class MainApp(QMainWindow):
         if hasattr(self.module_widget, "ahk_manager") and self.module_widget.ahk_manager.is_running():
             self.module_widget.ahk_manager.stop_script()
         if self._qt_app is not None:
+            if hasattr(self.module_widget, "_tooltip_filter"):
+                self._qt_app.removeEventFilter(self.module_widget._tooltip_filter)
+                self.module_widget._tooltip_filter.cleanup()
             if hasattr(self.module_widget, "_button_glow_filter"):
                 self._qt_app.removeEventFilter(self.module_widget._button_glow_filter)
             self._qt_app.removeEventFilter(self.module_widget)

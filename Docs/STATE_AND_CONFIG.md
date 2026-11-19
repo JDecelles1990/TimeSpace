@@ -124,6 +124,7 @@ Persisted as a JSON array in `data/hotstrings.json` via `Storage.load_hotstrings
   - `QPushButton`, `#primaryBtn`, `#successBtn`, `#dangerBtn`: 3D glossy rest gradients with shimmering hover gradients, `:focus` neon borders, and specular pressed bursts; paired with `ButtonGlowFilter`'s animated role-matched outer neon halos (`violet`, `cyan`, `green`, `magenta`, `gold`) across mouse hover, press, and `Tab` keyboard focus.
   - `QLineEdit`, `QPlainTextEdit`, `QTextEdit`, `QSpinBox`, `QComboBox`: Dark glass gradients transitioning to violet borders/glows on `:hover` and electric cyan borders/halos on `:focus` (`Tab` / `Shift+Tab` traverses multi-line editors via `tabChangesFocus`).
   - `QSlider`, `QProgressBar`, `QScrollBar`, `QSplitter::handle`, `QCheckBox`, `QListWidget`: Iridescent violet ➔ cyan ➔ emerald progress fills, radial orb slider handles, neon hover/drag scrollbars & splitter handles, keyboard `:focus` indicators on checkboxes/tabs/lists, and gradient list row highlights.
+  - `QToolTip` & `NeonToolTip`: Cyber-Aurora dark-glass `QToolTip` QSS fallback styling in `DARK_QSS` paired with the frameless translucent `NeonToolTip` overlay (`src/neon_tooltip.py`) featuring role-matched neon outer aura, iridescent gradient border, inner left accent pill, glossy specular sheen + shimmer sweep, and smooth fade/glide transitions.
 - **List Density**: `QListWidget` uses `11px` font and `2px 6px` item padding so the persistent Active Reminders Queue displays 7–9+ rows simultaneously and Activity lists display ~15+ rows.
 
 ### 2.4 Shared Domain Presets

@@ -5,6 +5,16 @@
 
 ---
 
+## [v3.20] — Cyber-Aurora Neon Glass Animated Hover Tooltips (2026-11-19)
+- **Custom Animated Neon Glass Tooltips (`src/neon_tooltip.py`, `src/__init__.py`)**:
+  - Created `NeonToolTip(QWidget)`, a frameless translucent top-level tooltip card (`WA_TranslucentBackground`, `WA_ShowWithoutActivating`, `WA_TransparentForMouseEvents`, `WindowDoesNotAcceptFocus`) painted with a multi-layered outer neon aura, Cyber-Aurora dark-glass gradient fill, top specular gloss reflection, left vertical neon accent pill, iridescent border, rich HTML multi-line text formatting, screen-edge clamping, `165ms` opacity fade + `+6px -> 0px` vertical glide-in, `360ms` glossy shimmer sweep, `115ms` fade-out, and `8000ms` auto-dismiss safety timer.
+  - Created `NeonToolTipFilter(QObject)`, an app-wide `QEvent.Type.ToolTip` interceptor supporting buttons, widgets, `QTabBar` tabs, `QAbstractItemView` items (`QListWidget`/`QTableWidget` viewports with live item-to-item hover updates), secondary windows (`FloatingMiniHUD`, `AlarmDialog`, `AHKHotstringsDialog`), and read-only role-matched neon accents (`default`, `primary`, `success`, `danger`, `warning`) without modifying any buttons.
+- **Cyber-Aurora `QToolTip` Fallback & Integration (`src/config.py`, `src/gui.py`)**:
+  - Added dark-glass `QToolTip` QSS styling in `DARK_QSS` as a seamless fallback without altering any button styles or `ButtonGlowFilter`.
+  - Installed `NeonToolTipFilter` on `QApplication.instance()` inside `TimerRendezVousWidget` with clean uninstallation and disposal on widget destruction and `MainApp.quit_app()`.
+
+---
+
 ## [v3.19] — Full `Tab` Element Navigation, `Ctrl+PgUp/PgDn` Tab Cycling & Power Shortcuts (2026-11-18)
 - **Full `Tab` / `Shift+Tab` Focus Navigation & Visual Rings (`src/gui.py`, `src/go_tab.py`, `src/config.py`)**:
   - Enabled `setTabChangesFocus(True)` on `ScratchpadEditor` (`QTextEdit`) and `GoTroubleshootingTab.console` (`QPlainTextEdit`) so pressing `Tab` / `Shift+Tab` cleanly moves through multi-line editors instead of trapping keyboard navigation.

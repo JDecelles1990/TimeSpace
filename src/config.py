@@ -565,6 +565,18 @@ QCheckBox::indicator:checked {{
         stop:0 {COLORS["glow_cyan"]}, stop:1 {COLORS["glow_green"]});
     border: 1px solid {COLORS["glow_specular"]};
 }}
+
+QToolTip {{
+    background-color: qlineargradient(x1:0, y1:0, x2:1, y2:1,
+        stop:0 #1d2240, stop:0.55 {COLORS["surface"]}, stop:1 {COLORS["bg_dark"]});
+    color: {COLORS["glow_specular"]};
+    border: 1px solid {COLORS["glow_cyan"]};
+    border-top: 1px solid {COLORS["glow_violet_light"]};
+    border-radius: 6px;
+    padding: 5px 9px;
+    font-family: "{FONT_FAMILY}", sans-serif;
+    font-size: 11px;
+}}
 """
 
 
