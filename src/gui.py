@@ -1,4 +1,5 @@
 """PySide6 UI Module for TimeSpace (Dual-Mode: F7Hub Embeddable QWidget & Standalone QMainWindow)."""
+import math
 import os
 import re
 import sys
@@ -6,17 +7,20 @@ import time
 import datetime
 from typing import Optional, List, Tuple, Callable
 
-from PySide6.QtCore import Qt, QTimer, Signal, QObject, QUrl, QPoint, QEvent, QVariantAnimation, QEasingCurve
+from PySide6.QtCore import Qt, QTimer, Signal, QObject, QUrl, QPoint, QPointF, QRectF, QEvent, QVariantAnimation, QEasingCurve
 from PySide6.QtGui import (
     QKeySequence,
     QShortcut,
     QColor,
+    QCursor,
     QGuiApplication,
     QDesktopServices,
     QFont,
     QIcon,
     QPainter,
+    QPen,
     QLinearGradient,
+    QRadialGradient,
     QPixmap,
     QSyntaxHighlighter,
     QTextCharFormat,
@@ -84,7 +88,7 @@ from src.circular_ring import CircularProgressRing
 from src.calendar_widget import MiniCalendar
 from src.time_picker import BigButtonsTimePicker
 from src.alarm_dialog import AlarmDialog
-from src.mini_hud import FloatingMiniHUD
+from src.mini_hud import FloatingMiniHUD, HudAlarmEntry
 from src.hotkey_manager import GlobalHotkeyListener
 from src.go_tab import GoTroubleshootingTab
 from src.ahk_manager import AHKProcessManager, find_ahk_v2_exe, generate_ahk_v2_script
@@ -267,6 +271,13 @@ class ButtonGlowFilter(QObject):
         except RuntimeError:
             return False
         return False
+
+
+def _alpha_color(hex_color: str, alpha: int) -> QColor:
+    """Return a QColor from a palette hex token with clamped 0..255 alpha."""
+    c = QColor(hex_color)
+    c.setAlpha(max(0, min(255, int(alpha))))
+    return c
 
 
 class TabTransitionOverlay(QWidget):
@@ -510,7 +521,7 @@ class RichScratchpadPane(QWidget):
         self.find_bar = QFrame(self)
         self.find_bar.setVisible(False)
         self.find_bar.setStyleSheet(
-            f"QFrame {{ background-color: {COLORS['surface']}; border: 1px solid {COLORS['border']}; border-radius: 4px; }}"
+            f"QFrame {{ background-color: rgba(20, 22, 37, 210); border: 1px solid {COLORS['border']}; border-radius: 4px; }}"
         )
         fb_layout = QHBoxLayout(self.find_bar)
         fb_layout.setContentsMargins(4, 2, 4, 2)
@@ -803,6 +814,7 @@ class TimerRendezVousWidget(QWidget):
         super().__init__(parent)
         self.setStyleSheet(DARK_QSS)
         self.setMinimumWidth(0)
+        self._init_aurora_backdrop()
 
         # Load Unified Typed State
         self.app_config: AppConfig = Storage.load_config()
@@ -819,6 +831,8 @@ class TimerRendezVousWidget(QWidget):
         # Floating Mini HUD State
         self.hud: Optional[FloatingMiniHUD] = None
         self.hud_enabled: bool = self.app_config.hud_enabled
+        self._hud_pinned_item_id: Optional[str] = None
+        self._hud_current_item_id: Optional[str] = None
 
         # Thread-safe Qt Signal Bridge
         self.bridge = SchedulerBridge(self)
@@ -875,6 +889,256 @@ class TimerRendezVousWidget(QWidget):
             QTimer.singleShot(1200, self._auto_start_ahk_script)
         if self.app_config.start_on_boot and not is_startup_enabled():
             set_startup_enabled(True)
+
+    def _init_aurora_backdrop(self) -> None:
+        """Initialize animated Cyber-Aurora backdrop & interactive mouse-hover spotlight state."""
+        self.setMouseTracking(True)
+        self._aurora_phase: float = 0.0
+        self._aurora_hover_level: float = 0.0
+        self._aurora_hovered: bool = False
+        self._aurora_mouse_x: float = 0.5
+        self._aurora_mouse_y: float = 0.35
+        self._aurora_target_x: float = 0.5
+        self._aurora_target_y: float = 0.35
+        self._aurora_shimmer_pos: float = -1.0
+        self._aurora_mode: str = "normal"
+        self._aurora_last_cursor: QPoint = QCursor.pos()
+
+        self._aurora_timer = QTimer(self)
+        self._aurora_timer.setInterval(40)
+        self._aurora_timer.timeout.connect(self._on_aurora_tick)
+
+        self._aurora_hover_anim = QVariantAnimation(self)
+        self._aurora_hover_anim.setEasingCurve(QEasingCurve.Type.OutCubic)
+        self._aurora_hover_anim.valueChanged.connect(self._on_aurora_hover_step)
+
+        self._aurora_shimmer_anim = QVariantAnimation(self)
+        self._aurora_shimmer_anim.setDuration(520)
+        self._aurora_shimmer_anim.setEasingCurve(QEasingCurve.Type.InOutSine)
+        self._aurora_shimmer_anim.setStartValue(-0.35)
+        self._aurora_shimmer_anim.setEndValue(1.35)
+        self._aurora_shimmer_anim.valueChanged.connect(self._on_aurora_shimmer_step)
+        self._aurora_shimmer_anim.finished.connect(self._on_aurora_shimmer_finished)
+
+    def _on_aurora_hover_step(self, val) -> None:
+        self._aurora_hover_level = max(0.0, min(1.0, float(val)))
+        self.update()
+
+    def _on_aurora_shimmer_step(self, val) -> None:
+        self._aurora_shimmer_pos = float(val)
+        self.update()
+
+    def _on_aurora_shimmer_finished(self) -> None:
+        self._aurora_shimmer_pos = -1.0
+        self.update()
+
+    def _set_aurora_hovered(self, hovered: bool) -> None:
+        if hovered == self._aurora_hovered:
+            return
+        self._aurora_hovered = hovered
+        self._aurora_hover_anim.stop()
+        self._aurora_hover_anim.setDuration(200 if hovered else 280)
+        self._aurora_hover_anim.setStartValue(self._aurora_hover_level)
+        self._aurora_hover_anim.setEndValue(1.0 if hovered else 0.0)
+        self._aurora_hover_anim.start()
+        if hovered and self._aurora_shimmer_anim.state() != self._aurora_shimmer_anim.State.Running:
+            self._aurora_shimmer_anim.start()
+
+    def _aurora_palette(self) -> Tuple[str, str, str]:
+        if self._aurora_mode == "urgent":
+            return COLORS["glow_magenta"], COLORS["glow_violet"], COLORS["glow_cyan"]
+        if self._aurora_mode == "warning":
+            return COLORS["glow_gold"], COLORS["glow_violet"], COLORS["glow_cyan"]
+        if self._aurora_mode == "paused":
+            return COLORS["border_shine"], COLORS["glow_violet_light"], COLORS["accent_hover"]
+        if self._aurora_mode == "meeting":
+            return COLORS["glow_cyan"], COLORS["accent"], COLORS["glow_violet"]
+        return COLORS["glow_violet"], COLORS["glow_cyan"], COLORS["glow_green"]
+
+    def _on_aurora_tick(self) -> None:
+        if not self.isVisible():
+            return
+        win = self.window()
+        if win is not None and win.isMinimized():
+            return
+
+        speed = 0.055 if self._aurora_mode == "urgent" else (0.042 if self._aurora_mode == "warning" else 0.032)
+        self._aurora_phase = (self._aurora_phase + speed) % (2.0 * math.pi)
+
+        cur_global = QCursor.pos()
+        if cur_global != self._aurora_last_cursor:
+            self._aurora_last_cursor = cur_global
+            local_pt = self.mapFromGlobal(cur_global)
+            w_under = QApplication.widgetAt(cur_global)
+            inside = (
+                self.rect().contains(local_pt)
+                and w_under is not None
+                and (w_under is self or self.isAncestorOf(w_under) or w_under is win)
+            )
+            if inside and self.width() > 0 and self.height() > 0:
+                self._aurora_target_x = max(0.02, min(0.98, local_pt.x() / float(self.width())))
+                self._aurora_target_y = max(0.02, min(0.98, local_pt.y() / float(self.height())))
+                self._set_aurora_hovered(True)
+            else:
+                self._set_aurora_hovered(False)
+
+        self._aurora_mouse_x += (self._aurora_target_x - self._aurora_mouse_x) * 0.18
+        self._aurora_mouse_y += (self._aurora_target_y - self._aurora_mouse_y) * 0.18
+        self.update()
+
+    def stop_aurora_backdrop(self) -> None:
+        """Stop backdrop timers & animations on hide/close/shutdown."""
+        if hasattr(self, "_aurora_timer"):
+            self._aurora_timer.stop()
+        if hasattr(self, "_aurora_hover_anim"):
+            self._aurora_hover_anim.stop()
+        if hasattr(self, "_aurora_shimmer_anim"):
+            self._aurora_shimmer_anim.stop()
+
+    def enterEvent(self, event) -> None:
+        if self.width() > 0 and self.height() > 0:
+            local_pt = self.mapFromGlobal(QCursor.pos())
+            if self.rect().contains(local_pt):
+                self._aurora_target_x = max(0.02, min(0.98, local_pt.x() / float(self.width())))
+                self._aurora_target_y = max(0.02, min(0.98, local_pt.y() / float(self.height())))
+        self._set_aurora_hovered(True)
+        super().enterEvent(event)
+
+    def leaveEvent(self, event) -> None:
+        cur = QCursor.pos()
+        w_under = QApplication.widgetAt(cur)
+        win = self.window()
+        inside = (
+            self.rect().contains(self.mapFromGlobal(cur))
+            and w_under is not None
+            and (w_under is self or self.isAncestorOf(w_under) or w_under is win)
+        )
+        if not inside or not getattr(event, "spontaneous", lambda: False)():
+            self._set_aurora_hovered(False)
+        super().leaveEvent(event)
+
+    def mouseMoveEvent(self, event) -> None:
+        if self.width() > 0 and self.height() > 0:
+            pos = event.position()
+            self._aurora_target_x = max(0.02, min(0.98, pos.x() / float(self.width())))
+            self._aurora_target_y = max(0.02, min(0.98, pos.y() / float(self.height())))
+            self._set_aurora_hovered(True)
+        super().mouseMoveEvent(event)
+
+    def showEvent(self, event) -> None:
+        self._aurora_last_cursor = QCursor.pos()
+        if hasattr(self, "_aurora_timer") and not self._aurora_timer.isActive():
+            self._aurora_timer.start()
+        super().showEvent(event)
+
+    def hideEvent(self, event) -> None:
+        self.stop_aurora_backdrop()
+        super().hideEvent(event)
+
+    def closeEvent(self, event) -> None:
+        self.stop_aurora_backdrop()
+        super().closeEvent(event)
+
+    def paintEvent(self, _event) -> None:
+        w = float(self.width())
+        h = float(self.height())
+        if w <= 1.0 or h <= 1.0:
+            return
+
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+
+        rect = QRectF(0.0, 0.0, w, h)
+        c_start, c_mid, c_end = self._aurora_palette()
+        pulse = 0.5 + 0.5 * math.sin(self._aurora_phase)
+        pulse2 = 0.5 + 0.5 * math.cos(self._aurora_phase * 0.85)
+        hover = self._aurora_hover_level
+
+        # 1. Opaque deep animated diagonal Cyber-Aurora base gradient
+        shift = math.sin(self._aurora_phase * 0.5)
+        bg_grad = QLinearGradient(
+            QPointF(w * (0.12 * shift), 0.0),
+            QPointF(w * (1.0 - 0.12 * shift), h),
+        )
+        bg_grad.setColorAt(0.0, _alpha_color(COLORS["surface_light"], 255))
+        bg_grad.setColorAt(0.45, _alpha_color(COLORS["surface"], 255))
+        bg_grad.setColorAt(1.0, _alpha_color(COLORS["bg_dark"], 255))
+        painter.fillRect(rect, bg_grad)
+
+        # 2. Two slow-breathing drifting aurora nebula orbs
+        orb1_center = QPointF(
+            w * (0.18 + 0.08 * math.sin(self._aurora_phase * 0.7)),
+            h * (0.16 + 0.06 * math.cos(self._aurora_phase * 0.55)),
+        )
+        orb1_r = max(w, h) * 0.62
+        orb1 = QRadialGradient(orb1_center, orb1_r)
+        orb1.setColorAt(0.0, _alpha_color(c_start, int(44 + 18 * pulse + 14 * hover)))
+        orb1.setColorAt(0.55, _alpha_color(c_start, int(18 + 8 * pulse)))
+        orb1.setColorAt(1.0, _alpha_color(COLORS["bg_dark"], 0))
+        painter.fillRect(rect, orb1)
+
+        orb2_center = QPointF(
+            w * (0.84 - 0.08 * math.cos(self._aurora_phase * 0.6)),
+            h * (0.86 - 0.07 * math.sin(self._aurora_phase * 0.5)),
+        )
+        orb2_r = max(w, h) * 0.58
+        orb2 = QRadialGradient(orb2_center, orb2_r)
+        orb2.setColorAt(0.0, _alpha_color(c_end, int(36 + 16 * pulse2 + 12 * hover)))
+        orb2.setColorAt(0.5, _alpha_color(c_mid, int(16 + 7 * pulse2)))
+        orb2.setColorAt(1.0, _alpha_color(COLORS["bg_dark"], 0))
+        painter.fillRect(rect, orb2)
+
+        # 3. Interactive mouse-hover aurora spotlight (drifts subtly at rest, follows cursor smoothly on hover)
+        rest_x = 0.5 + 0.22 * math.sin(self._aurora_phase * 0.55)
+        rest_y = 0.35 + 0.14 * math.cos(self._aurora_phase * 0.45)
+        spot_x = (rest_x * (1.0 - hover) + self._aurora_mouse_x * hover) * w
+        spot_y = (rest_y * (1.0 - hover) + self._aurora_mouse_y * hover) * h
+        spot_pt = QPointF(spot_x, spot_y)
+
+        halo_r = max(w, h) * 0.52
+        halo = QRadialGradient(spot_pt, halo_r)
+        halo.setColorAt(0.0, _alpha_color(c_mid, int(18 + 52 * hover)))
+        halo.setColorAt(0.45, _alpha_color(c_start, int(10 + 28 * hover)))
+        halo.setColorAt(1.0, _alpha_color(COLORS["bg_dark"], 0))
+        painter.fillRect(rect, halo)
+
+        if hover > 0.02:
+            sheen = QRadialGradient(spot_pt, 155.0)
+            sheen.setColorAt(0.0, _alpha_color(COLORS["glow_specular"], int(24 * hover)))
+            sheen.setColorAt(0.45, _alpha_color(c_mid, int(16 * hover)))
+            sheen.setColorAt(1.0, _alpha_color(COLORS["bg_dark"], 0))
+            painter.fillRect(rect, sheen)
+
+        # 4. Top specular glass horizon & diagonal enter shimmer sweep
+        gloss_h = min(96.0, h * 0.14)
+        gloss_rect = QRectF(0.0, 0.0, w, gloss_h)
+        gloss_grad = QLinearGradient(gloss_rect.topLeft(), gloss_rect.bottomLeft())
+        gloss_grad.setColorAt(0.0, _alpha_color(COLORS["glow_specular"], int(14 + 12 * hover)))
+        gloss_grad.setColorAt(1.0, _alpha_color(COLORS["glow_specular"], 0))
+        painter.fillRect(gloss_rect, gloss_grad)
+
+        if -0.35 <= self._aurora_shimmer_pos <= 1.35:
+            cx = w * self._aurora_shimmer_pos
+            band_w = max(90.0, w * 0.25)
+            shimmer_grad = QLinearGradient(QPointF(cx - band_w, 0.0), QPointF(cx + band_w, h))
+            shimmer_grad.setColorAt(0.0, _alpha_color(COLORS["glow_specular"], 0))
+            shimmer_grad.setColorAt(0.5, _alpha_color(COLORS["glow_specular"], 28))
+            shimmer_grad.setColorAt(1.0, _alpha_color(COLORS["glow_specular"], 0))
+            painter.fillRect(rect, shimmer_grad)
+
+        # 5. Shifting iridescent neon inner rim
+        rim_shift = 0.5 + 0.5 * math.cos(self._aurora_phase)
+        rim_grad = QLinearGradient(
+            QPointF(w * 0.3 * rim_shift, 0.0),
+            QPointF(w * (1.0 - 0.3 * rim_shift), h),
+        )
+        rim_grad.setColorAt(0.0, _alpha_color(c_start, 185))
+        rim_grad.setColorAt(0.5, _alpha_color(c_mid, 175))
+        rim_grad.setColorAt(1.0, _alpha_color(c_end, 185))
+        rim_pen = QPen(rim_grad, 1.4 + 0.6 * hover)
+        painter.setPen(rim_pen)
+        painter.setBrush(Qt.BrushStyle.NoBrush)
+        painter.drawRect(QRectF(0.75, 0.75, w - 1.5, h - 1.5))
 
     # ── Background Thread Callbacks (Emit via Bridge) ────────────────────────
 
@@ -965,7 +1229,7 @@ class TimerRendezVousWidget(QWidget):
         self.hero_deck_frame = QFrame()
         self.hero_deck_frame.setStyleSheet(
             f"QFrame {{ background-color: qlineargradient(x1:0, y1:0, x2:0, y2:1, "
-            f"stop:0 #1d213a, stop:0.15 {COLORS['surface']}, stop:1 #0f111d); "
+            f"stop:0 rgba(30, 34, 56, 178), stop:0.15 rgba(20, 22, 37, 158), stop:1 rgba(12, 13, 22, 178)); "
             f"border: 1px solid {COLORS['border']}; border-top: 1px solid {COLORS['border_shine']}; border-radius: 6px; }}"
         )
         deck_layout = QHBoxLayout(self.hero_deck_frame)
@@ -1840,7 +2104,7 @@ class TimerRendezVousWidget(QWidget):
         self.scratchpad_top_frame = QFrame(self)
         self.scratchpad_top_frame.setStyleSheet(
             f"QFrame {{ background-color: qlineargradient(x1:0, y1:0, x2:0, y2:1, "
-            f"stop:0 #1d213a, stop:0.15 {COLORS['surface']}, stop:1 #0f111d); "
+            f"stop:0 rgba(30, 34, 56, 178), stop:0.15 rgba(20, 22, 37, 158), stop:1 rgba(12, 13, 22, 178)); "
             f"border: 1px solid {COLORS['border']}; border-top: 1px solid {COLORS['border_shine']}; border-radius: 6px; }}"
         )
         top_sp_layout = QVBoxLayout(self.scratchpad_top_frame)
@@ -2530,14 +2794,20 @@ class TimerRendezVousWidget(QWidget):
             )
 
     def _toggle_active_timer_pause(self) -> None:
-        active = self.scheduler.get_active_timer()
-        if active:
-            now_paused = self.scheduler.toggle_pause(active.id)
+        target = self.scheduler.get_active_timer()
+        if target is None and self._hud_pinned_item_id:
+            target = self.scheduler.get_item(self._hud_pinned_item_id)
+        if target is None:
+            target = self.scheduler.get_nearest_item()
+        if target is None:
+            upcoming = self.scheduler.get_upcoming_items()
+            if upcoming:
+                target = upcoming[0]
+        if target:
+            now_paused = self.scheduler.toggle_pause(target.id)
+            if target.kind != "timer":
+                self._hud_pinned_item_id = target.id if now_paused else None
             self.btn_ring_play_pause.setText("▶️" if now_paused else "⏸️")
-        else:
-            nearest = self.scheduler.get_nearest_item()
-            if nearest:
-                self.scheduler.toggle_pause(nearest.id)
         self._refresh_loop()
 
     def _stop_active_timer(self) -> None:
@@ -3080,6 +3350,26 @@ class TimerRendezVousWidget(QWidget):
         else:
             self._show_hud()
 
+    def _get_hud_upcoming_entries(self) -> List[HudAlarmEntry]:
+        now = time.time()
+        entries: List[HudAlarmEntry] = []
+        for it in self.scheduler.get_upcoming_items(now):
+            rem = it.remaining_paused if it.is_paused else max(0.0, it.target_time - now)
+            entries.append(
+                HudAlarmEntry(
+                    id=it.id,
+                    kind=it.kind,
+                    name=it.name,
+                    remaining_sec=rem,
+                    ring_time_str=self._fmt_target(it, now),
+                    is_paused=it.is_paused,
+                    is_repeating=(it.repeat_sec > 0 or it.repeat_rule != "none"),
+                    category=it.category,
+                    note=it.note,
+                )
+            )
+        return entries
+
     def _show_hud(self) -> None:
         opacity_ratio = max(0.60, min(1.0, self.app_config.overlay_opacity / 100.0))
         if self.hud is None:
@@ -3088,16 +3378,19 @@ class TimerRendezVousWidget(QWidget):
                 on_toggle_pause=self._toggle_active_timer_pause,
                 on_bring_main_to_front=lambda: self.window().showNormal(),
                 on_close=self._on_hud_close,
+                on_get_upcoming_items=self._get_hud_upcoming_entries,
                 initial_x=self.app_config.hud_x,
                 initial_y=self.app_config.hud_y,
                 opacity=opacity_ratio,
             )
         else:
+            self.hud.on_get_upcoming_items = self._get_hud_upcoming_entries
             self.hud.set_hud_opacity(opacity_ratio)
         self.hud.show()
         self.hud.raise_()
         self.hud_enabled = True
         self.btn_hud_toggle.setText("📌 HUD: ON")
+        self._refresh_loop()
 
     def _on_hud_close(self) -> None:
         self._save_hud_pos()
@@ -3333,6 +3626,9 @@ class TimerRendezVousWidget(QWidget):
 
         nearest_item: Optional[ScheduledItem] = None
         nearest_delta: float = 99999999.0
+        nearest_paused_item: Optional[ScheduledItem] = None
+        nearest_paused_delta: float = 99999999.0
+        pinned_item: Optional[ScheduledItem] = None
         active_timer: Optional[ScheduledItem] = None
         queue_rows: List[Tuple[str, Optional[str], Optional[QColor]]] = []
 
@@ -3340,12 +3636,18 @@ class TimerRendezVousWidget(QWidget):
             if it.is_paused:
                 remain = it.remaining_paused
                 status_prefix = "⏸ "
+                if remain < nearest_paused_delta:
+                    nearest_paused_delta = remain
+                    nearest_paused_item = it
             else:
                 remain = max(0.0, it.target_time - now)
                 status_prefix = ""
                 if remain < nearest_delta:
                     nearest_delta = remain
                     nearest_item = it
+
+            if self._hud_pinned_item_id and it.id == self._hud_pinned_item_id:
+                pinned_item = it
 
             if it.kind == "timer" and active_timer is None:
                 active_timer = it
@@ -3382,42 +3684,51 @@ class TimerRendezVousWidget(QWidget):
         total_active = len(self.scheduler.items)
         self.lbl_queue_status.setText(f"{total_active} active" if total_active else "All quiet")
 
+        if self._hud_pinned_item_id:
+            if pinned_item is None or not pinned_item.is_paused:
+                self._hud_pinned_item_id = None
+                pinned_item = None
+
+        display_item = active_timer or pinned_item or nearest_item or nearest_paused_item
+        self._hud_current_item_id = display_item.id if display_item else None
+
         # Update Radial Progress Ring
-        if active_timer:
-            rem = active_timer.remaining_paused if active_timer.is_paused else max(0.0, active_timer.target_time - now)
-            tot = max(1.0, active_timer.original_duration)
+        if display_item:
+            rem = display_item.remaining_paused if display_item.is_paused else max(0.0, display_item.target_time - now)
+            tot = max(1.0, display_item.original_duration or rem)
+            is_rep = (display_item.repeat_sec > 0) if display_item.kind == "timer" else (display_item.repeat_rule != "none")
             self.ring.update_countdown(
                 remaining_sec=rem,
                 total_sec=tot,
-                title=active_timer.name,
-                is_repeating=active_timer.repeat_sec > 0,
-                is_paused=active_timer.is_paused,
+                title=display_item.name,
+                is_repeating=is_rep,
+                is_paused=display_item.is_paused,
             )
-            self.btn_ring_play_pause.setText("▶️" if active_timer.is_paused else "⏸️")
-        elif nearest_item:
-            rem = nearest_item.remaining_paused if nearest_item.is_paused else max(0.0, nearest_item.target_time - now)
-            tot = max(1.0, nearest_item.original_duration or rem)
-            self.ring.update_countdown(
-                remaining_sec=rem,
-                total_sec=tot,
-                title=nearest_item.name,
-                is_repeating=nearest_item.repeat_rule != "none",
-                is_paused=nearest_item.is_paused,
-            )
-            self.btn_ring_play_pause.setText("⏸️")
+            self.btn_ring_play_pause.setText("▶️" if display_item.is_paused else "⏸️")
         else:
             self.ring.set_idle()
             self.btn_ring_play_pause.setText("⏸️")
 
         # Update Floating Mini HUD
         if self.hud and self.hud.isVisible():
-            hud_item = active_timer or nearest_item
-            if hud_item:
-                rem = hud_item.remaining_paused if hud_item.is_paused else max(0.0, hud_item.target_time - now)
-                is_ticket = hud_item.category == "🎫 Ticket"
-                self.hud.update_status(hud_item.name, rem, is_paused=hud_item.is_paused, is_sla=is_ticket)
+            if display_item:
+                rem = display_item.remaining_paused if display_item.is_paused else max(0.0, display_item.target_time - now)
+                tot = max(1.0, display_item.original_duration or rem)
+                is_ticket = display_item.category == "🎫 Ticket"
+                other_count = max(0, len(self.scheduler.items) - 1)
+                self.hud.update_status(
+                    display_item.name,
+                    rem,
+                    is_paused=display_item.is_paused,
+                    is_sla=is_ticket,
+                    total_sec=tot,
+                    other_count=other_count,
+                    item_id=display_item.id,
+                )
             else:
                 self.hud.set_idle()
+            if self.hud.is_upcoming_visible():
+                self.hud.refresh_upcoming_entries(self._get_hud_upcoming_entries())
 
         self._refresh_activity_tab(now)
 
@@ -3427,6 +3738,19 @@ class TimerRendezVousWidget(QWidget):
         else:
             self._mic_active = False
         self._update_meeting_mode_ui()
+
+        if display_item:
+            disp_rem = display_item.remaining_paused if display_item.is_paused else max(0.0, display_item.target_time - now)
+            if display_item.is_paused:
+                self._aurora_mode = "paused"
+            elif disp_rem < 60:
+                self._aurora_mode = "urgent"
+            elif disp_rem < 300:
+                self._aurora_mode = "warning"
+            else:
+                self._aurora_mode = "meeting" if self.is_meeting_mode_active() else "normal"
+        else:
+            self._aurora_mode = "meeting" if self.is_meeting_mode_active() else "normal"
 
     def _refresh_activity_tab(self, now: float) -> None:
         timers = [it for it in self.scheduler.items if it.kind == "timer"]
@@ -3688,6 +4012,8 @@ class MainApp(QMainWindow):
     def quit_app(self) -> None:
         self.module_widget._save_scratchpad_now()
         self.module_widget._save_hud_pos()
+        if hasattr(self.module_widget, "stop_aurora_backdrop"):
+            self.module_widget.stop_aurora_backdrop()
         Storage.save_config(self.module_widget.app_config)
         if hasattr(self, "_hotkey_listener") and self._hotkey_listener:
             self._hotkey_listener.stop()

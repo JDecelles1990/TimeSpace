@@ -5,6 +5,37 @@
 
 ---
 
+## [v3.23] — Natural Schedule Compound Relative Durations & RDV Label Preservation (2026-11-20)
+- **Compound Relative Duration Parsing (`src/natural_parser.py`)**:
+  - Added `_consume_compound_duration()` (`_COMPOUND_UNIT_RE`, `_COMPOUND_CONNECTOR_RE`) supporting multi-unit durations chained with spaces, commas, `and`, or `+` (e.g., `"RDV in 5 days and 3 hours"`, `"RDV in 5 days, 3 hours and 20 minutes"`, `"RDV in 5d 3h 15m"`, `"RDV in 5 days and half an hour"`, `"RDV in 1 week and 2 days"`).
+  - Updated `_try_relative_days()` to compute exact `now + timedelta(days=..., seconds=...)` offsets whenever sub-day units (`hours`/`minutes`/`seconds`) accompany days/weeks, while keeping pure day/week phrases (`"Call Sam in 2 days"`, `"Call Sam in 2 days at 3pm"`) anchored to `12:00` or the specified clock time.
+  - Added `_infer_rdv_fallback()` and updated `_normalize_natural_idioms()` + `parse()` Rules 1 & 6 so `"RDV in 5 days and 3 hours"` cleanly schedules a Rendez-vous named `"RDV"` instead of leaking `"and 3 hours"` into the title, and `"Remind me to check backup in 5 days and 3 hours"` / `"RDV in 3 hours"` both resolve accurately.
+
+---
+
+## [v3.22] — Dynamic Cyber-Aurora App Gradient Backdrop & Interactive Mouse-Hover Glass Effect (2026-11-20)
+- **5-Layer Living Cyber-Aurora App Backdrop & Mouse Spotlight (`src/gui.py`)**:
+  - Added `paintEvent`, `_init_aurora_backdrop`, `_on_aurora_tick`, `stop_aurora_backdrop`, and hover/move/show/hide/close lifecycle handlers on `TimerRendezVousWidget`.
+  - Paints a continuously breathing diagonal obsidian-to-surface gradient with two drifting nebula aurora orbs (`COLORS["glow_violet"]`, `COLORS["glow_cyan"]`, `COLORS["glow_green"]` — dynamically adapting across `"normal"`, `"meeting"`, `"warning"`, `"urgent"`, and `"paused"` states), a smooth `0.18` lerp cursor-tracking aurora spotlight & specular sheen on hover, a top glass horizon + diagonal `520ms` enter shimmer sweep, and a shifting iridescent perimeter rim.
+  - Zero-dead-zone cursor polling (`40ms` timer active only while visible and un-minimized) ensures hovering over child inputs, buttons, lists, or tooltips seamlessly tracks the spotlight across the entire window without flicker.
+- **Frosted Translucent Dark-Glass Panels (`src/config.py`, `src/gui.py`, `src/go_tab.py`)**:
+  - Updated `DARK_QSS` (`QWidget { background-color: transparent; }` with explicit dark surfaces on `QMainWindow`, `QDialog`, `QMessageBox`, `QTableWidget`, and `QHeaderView::section`) alongside translucent `rgba(...)` glass panels on `QGroupBox`, `QGroupBox::title`, `QTabWidget::pane`, `QListWidget`, inputs, scrollbars, `hero_deck_frame`, `scratchpad_top_frame`, `find_bar`, and `tab_go.console` so the dynamic aurora backdrop shines cleanly underneath all UI cards.
+
+---
+
+## [v3.21] — Cyber-Aurora Floating Mini HUD Redesign, Pause/Resume Fix & Animated Upcoming-Alarms Popover (2026-11-20)
+- **Symmetrical Pause/Resume Fix for Timers & Rendez-vous (`src/scheduler.py`, `src/gui.py`)**:
+  - Added `ReminderScheduler.get_upcoming_items()` returning all scheduled items sorted by active status and remaining time.
+  - Added `_hud_pinned_item_id` tracking in `TimerRendezVousWidget` so pausing a Rendez-vous via the HUD `⏸` or Hero Ring `⏸️` button keeps it displayed in paused state with `▶` / `▶️` ready to resume instead of snapping to "All Quiet" or another alarm.
+- **Upcoming Alarms Emoji Button & Animated Popover (`src/mini_hud.py`, `src/gui.py`, `src/__init__.py`)**:
+  - Added the **`📋`** button on `FloatingMiniHUD` and `HudUpcomingPopover(QWidget)` — a frameless translucent Cyber-Aurora popover anchored dynamically below/above the HUD showing all other upcoming alarms (`HudAlarmEntry`), live countdowns, ring timestamps, categories, notes, and repeating badges.
+  - Features 4-layer breathing outer neon aura, dark-glass gradient fill with drifting aurora highlight, diagonal shimmer sweep, smooth fade+glide reveal (`200ms`) and dismiss (`180ms`), automatic screen-edge clamping, hover-to-pause-countdown inspection, and a depleting neon bottom progress bar (`~4.5s`).
+- **Cyber-Aurora Floating Mini HUD Aesthetic Redesign (`src/mini_hud.py`, `src/config.py`)**:
+  - Updated `UI_DIMENSIONS` (`hud_width: 330`, `hud_height: 62`) for a `310×42` translucent glass pill surrounded by a `10px` soft breathing outer neon aura.
+  - Upgraded `FloatingMiniHUD` (`WA_TranslucentBackground`) with shifting iridescent borders, urgency-reactive color palettes (`normal`, `warning`, `urgent`, `paused`, `idle`), cursor-tracking radial spotlight on hover, hover/toggle diagonal shimmer sweeps, fade-in transition on reveal, glowing left neon accent bar, and a live countdown micro-progress bar.
+
+---
+
 ## [v3.20] — Cyber-Aurora Neon Glass Animated Hover Tooltips (2026-11-19)
 - **Custom Animated Neon Glass Tooltips (`src/neon_tooltip.py`, `src/__init__.py`)**:
   - Created `NeonToolTip(QWidget)`, a frameless translucent top-level tooltip card (`WA_TranslucentBackground`, `WA_ShowWithoutActivating`, `WA_TransparentForMouseEvents`, `WindowDoesNotAcceptFocus`) painted with a multi-layered outer neon aura, Cyber-Aurora dark-glass gradient fill, top specular gloss reflection, left vertical neon accent pill, iridescent border, rich HTML multi-line text formatting, screen-edge clamping, `165ms` opacity fade + `+6px -> 0px` vertical glide-in, `360ms` glossy shimmer sweep, `115ms` fade-out, and `8000ms` auto-dismiss safety timer.

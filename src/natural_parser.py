@@ -50,6 +50,16 @@ _DURATION_UNIT_RE = re.compile(
     re.IGNORECASE,
 )
 
+_COMPOUND_UNIT_RE = re.compile(
+    r"^(\d+)\s*(weeks?|wks?|w|days?|d|hours?|hrs?|h|minutes?|mins?|m|seconds?|secs?|s)\b",
+    re.IGNORECASE,
+)
+
+_COMPOUND_CONNECTOR_RE = re.compile(
+    r"^(?:\s*,\s*and\s+|\s+and\s+|\s*,\s*|\s*\+\s*|\s+)",
+    re.IGNORECASE,
+)
+
 _CONVERSATIONAL_PREFIXES = (
     (re.compile(r"^(?:create|add|set)\s+(?:an?\s+|the\s+)?alarm(?:\s+(?:for|on|to))?\s+", re.IGNORECASE), "Alarm"),
     (re.compile(r"^(?:create|add|set)\s+(?:an?\s+|the\s+)?reminder(?:\s+(?:for|on|to))?\s+", re.IGNORECASE), "Reminder"),
@@ -141,12 +151,20 @@ def _parse_time_str(h: int, m: int, ampm: Optional[str], tod: Optional[str], is_
 
 
 def _normalize_natural_idioms(text: str) -> str:
-    """Normalize friendly idioms like 'half an hour', 'an hour', and 'day after tomorrow'."""
+    """Normalize friendly idioms like 'half an hour', 'an hour', 'a day', and 'day after tomorrow'."""
     out = re.sub(r"\b(?:the\s+)?day\s+after\s+tomorrow\b", "in 2 days", text, flags=re.IGNORECASE)
-    out = re.sub(r"\b(in|for)\s+(?:half\s+an\s+hour|a\s+half\s+hour)\b", r"\1 30 minutes", out, flags=re.IGNORECASE)
-    out = re.sub(r"\b(in|for)\s+an?\s+hour\b", r"\1 1 hour", out, flags=re.IGNORECASE)
-    out = re.sub(r"\b(in|for)\s+a\s+minute\b", r"\1 1 minute", out, flags=re.IGNORECASE)
-    out = re.sub(r"\b(in|for)\s+a\s+second\b", r"\1 1 second", out, flags=re.IGNORECASE)
+    out = re.sub(r"\b(in|for|and)\s+(?:half\s+an\s+hour|a\s+half\s+hour)\b", r"\1 30 minutes", out, flags=re.IGNORECASE)
+    out = re.sub(r"([,+])\s*(?:half\s+an\s+hour|a\s+half\s+hour)\b", r"\1 30 minutes", out, flags=re.IGNORECASE)
+    out = re.sub(r"\b(in|for|and)\s+an?\s+hour\b", r"\1 1 hour", out, flags=re.IGNORECASE)
+    out = re.sub(r"([,+])\s*an?\s+hour\b", r"\1 1 hour", out, flags=re.IGNORECASE)
+    out = re.sub(r"\b(in|for|and)\s+a\s+minute\b", r"\1 1 minute", out, flags=re.IGNORECASE)
+    out = re.sub(r"([,+])\s*a\s+minute\b", r"\1 1 minute", out, flags=re.IGNORECASE)
+    out = re.sub(r"\b(in|for|and)\s+a\s+second\b", r"\1 1 second", out, flags=re.IGNORECASE)
+    out = re.sub(r"([,+])\s*a\s+second\b", r"\1 1 second", out, flags=re.IGNORECASE)
+    out = re.sub(r"\b(in|for|and)\s+a\s+day\b", r"\1 1 day", out, flags=re.IGNORECASE)
+    out = re.sub(r"([,+])\s*a\s+day\b", r"\1 1 day", out, flags=re.IGNORECASE)
+    out = re.sub(r"\b(in|for|and)\s+a\s+week\b", r"\1 1 week", out, flags=re.IGNORECASE)
+    out = re.sub(r"([,+])\s*a\s+week\b", r"\1 1 week", out, flags=re.IGNORECASE)
     return " ".join(out.split())
 
 
@@ -172,6 +190,21 @@ def _clean_task_name(raw_name: str, fallback: str) -> str:
     cleaned = re.sub(r"\b(?:rdv|appointment|rendez-vous)\b", "", cleaned, flags=re.IGNORECASE)
     cleaned = " ".join(cleaned.split()).strip(" ,.-:")
     return cleaned or fallback
+
+
+def _infer_rdv_fallback(raw_text: str, default_name: Optional[str]) -> Optional[str]:
+    """Preserve explicit RDV / Rendez-vous / Appointment keyword as fallback label when no task remains."""
+    if default_name:
+        return default_name
+    m = re.search(r"\b(rdv|rendez-vous|appointment)\b", raw_text, re.IGNORECASE)
+    if m:
+        kw = m.group(1).lower()
+        if kw == "rdv":
+            return "RDV"
+        if kw == "rendez-vous":
+            return "Rendez-vous"
+        return "Appointment"
+    return None
 
 
 # ---------------------------------------------------------------------------
@@ -215,9 +248,9 @@ class NaturalParser:
         m = re.match(r"^remind\s+me\s+to\s+(.+?)\s+in\s+(\d+.+)$", normalized, re.IGNORECASE)
         if m:
             task = m.group(1).strip()
-            secs = NaturalParser._parse_duration_seconds(m.group(2))
-            if secs > 0:
-                return NaturalParser._build_timer(task or "Reminder", secs)
+            total_days, sub_sec, rem = NaturalParser._consume_compound_duration(m.group(2))
+            if total_days == 0 and sub_sec > 0 and not rem:
+                return NaturalParser._build_timer(task or "Reminder", sub_sec)
 
         # ── 2. "remind me in <duration> [to/for] <task>" ───────────────────
         m = re.match(r"^remind\s+me\s+in\s+(\d+\w*.*)$", normalized, re.IGNORECASE)
@@ -253,14 +286,12 @@ class NaturalParser:
             return rdv_days
 
         # ── 6. "<task> in <duration h/m/s>" ─────────────────────────────────
-        m = re.match(
-            r"^(.+?)\s+in\s+(\d+\s*(?:h|hr|hours?|m|min|mins|minutes?|s|sec|seconds?)(?:\s+and\s+\d+\s*(?:h|hr|hours?|m|min|mins|minutes?|s|sec|seconds?))*)$",
-            body, re.IGNORECASE,
-        )
+        m = re.match(r"^(.+?)\s+in\s+(\d+.+)$", body, re.IGNORECASE)
         if m:
-            secs = NaturalParser._parse_duration_seconds(m.group(2))
-            if secs > 0:
-                return NaturalParser._build_timer(_clean_task_name(m.group(1), conv_default or "Quick Timer"), secs)
+            total_days, sub_sec, rem = NaturalParser._consume_compound_duration(m.group(2))
+            if total_days == 0 and sub_sec > 0 and not rem:
+                fallback = _infer_rdv_fallback(m.group(1), conv_default) or "Quick Timer"
+                return NaturalParser._build_timer(_clean_task_name(m.group(1), fallback), sub_sec)
 
         # ── 7. Explicit / ordinal calendar dates ("Friday the 13th", "Nov 20th", "the 13th", "2026-12-05") ─
         cal_date = NaturalParser._try_calendar_date(body, default_name=conv_default or "Appointment")
@@ -366,42 +397,59 @@ class NaturalParser:
         return total
 
     @staticmethod
+    def _consume_compound_duration(text: str) -> Tuple[int, int, str]:
+        """
+        Consume one or more leading duration tokens connected by spaces, ',', 'and', or '+'.
+        Returns (total_days, sub_day_seconds, unconsumed_trailing_text).
+        """
+        src = text.lstrip()
+        first = _COMPOUND_UNIT_RE.match(src)
+        if not first:
+            return 0, 0, text
+
+        total_days = 0
+        sub_sec = 0
+
+        def _add_token(val_s: str, unit_s: str) -> None:
+            nonlocal total_days, sub_sec
+            val = int(val_s)
+            u = unit_s.lower()
+            if u.startswith("w"):
+                total_days += val * 7
+            elif u.startswith("d"):
+                total_days += val
+            elif u.startswith("h"):
+                sub_sec += val * 3600
+            elif u.startswith("m"):
+                sub_sec += val * 60
+            elif u.startswith("s"):
+                sub_sec += val
+
+        _add_token(first.group(1), first.group(2))
+        pos = first.end()
+
+        while pos < len(src):
+            cm = _COMPOUND_CONNECTOR_RE.match(src[pos:])
+            if not cm:
+                break
+            next_start = pos + cm.end()
+            um = _COMPOUND_UNIT_RE.match(src[next_start:])
+            if not um:
+                break
+            _add_token(um.group(1), um.group(2))
+            pos = next_start + um.end()
+
+        return total_days, sub_sec, src[pos:].strip()
+
+    @staticmethod
     def _try_timer_from_in(rest: str, default_name: str) -> Optional[Dict[str, Any]]:
         """Parse leading h/m/s duration from 'rest'; remainder is task name."""
-        unit_re = re.compile(
-            r"^(\d+)\s*(h(?:ours?)?|m(?:in(?:ute)?s?)?|s(?:ec(?:ond)?s?)?)\b",
-            re.IGNORECASE,
-        )
-        total_sec = 0
-        pos = 0
-        temp = rest
-        found = False
-
-        while True:
-            temp = temp.lstrip()
-            um = unit_re.match(temp)
-            if not um:
-                am = re.match(r"^and\s+", temp, re.IGNORECASE)
-                if am:
-                    temp = temp[len(am.group(0)):]
-                    continue
-                break
-            found = True
-            val, unit = int(um.group(1)), um.group(2).lower()
-            if unit.startswith("h"):
-                total_sec += val * 3600
-            elif unit.startswith("m"):
-                total_sec += val * 60
-            elif unit.startswith("s"):
-                total_sec += val
-            consumed = len(rest) - len(temp) + len(um.group(0))
-            pos = consumed
-            temp = temp[len(um.group(0)):]
-
-        if found and total_sec > 0:
-            name = rest[pos:].strip()
-            name = re.sub(r"^(?:to|for)\s+", "", name, flags=re.IGNORECASE).strip()
-            return NaturalParser._build_timer(name or default_name, total_sec)
+        total_days, sub_sec, rem = NaturalParser._consume_compound_duration(rest)
+        if total_days > 0:
+            return None
+        if sub_sec > 0:
+            name = re.sub(r"^(?:to|for)\s+", "", rem, flags=re.IGNORECASE).strip()
+            return NaturalParser._build_timer(name or default_name, sub_sec)
         return None
 
     # ── Relative-day rendez-vous ─────────────────────────────────────────────
@@ -409,49 +457,65 @@ class NaturalParser:
     @staticmethod
     def _try_relative_days(text: str, default_name: Optional[str] = None) -> Optional[Dict[str, Any]]:
         """
-        Handle patterns like:
-          "<task> in <N> days [at <time>]"
-          "<task> in <N> week[s] [at <time>]"
+        Handle patterns including compound relative offsets:
+          "RDV in 5 days and 3 hours"
+          "<task> in <N> days/weeks [and <H> hours ...] [at <time>]"
           "in <N> days [at <time>] [<task>]"
         """
-        pattern = re.compile(
-            r"^(.*?)\bin\s+(\d+)\s+(days?|weeks?)\b(.*?)$",
-            re.IGNORECASE,
-        )
-        m = pattern.match(text.strip())
-        if not m:
-            return None
+        stripped = text.strip()
+        for m in re.finditer(r"\bin\s+(?=\d)", stripped, re.IGNORECASE):
+            pre_task = stripped[: m.start()].strip()
+            after_in = stripped[m.end() :]
+            total_days, sub_sec, post_text = NaturalParser._consume_compound_duration(after_in)
+            if total_days <= 0:
+                continue
 
-        pre_task = m.group(1).strip()
-        n = int(m.group(2))
-        unit = m.group(3).lower()
-        post_text = m.group(4).strip()
+            now = datetime.datetime.now()
+            if sub_sec > 0:
+                target_dt = now + datetime.timedelta(days=total_days, seconds=sub_sec)
+                delta = float(total_days * 86400 + sub_sec)
+                post_clean = post_text
+                day_label = target_dt.strftime("%a, %b %d")
+                time_label = target_dt.strftime("%H:%M:%S") if (sub_sec % 60) != 0 else target_dt.strftime("%H:%M")
+            else:
+                base_date = now.date() + datetime.timedelta(days=total_days)
+                h_out, min_out, post_clean = NaturalParser._extract_time_from_text(post_text)
+                if h_out is None or min_out is None:
+                    h_out, min_out = 12, 0
+                    post_clean = post_text
+                target_dt = datetime.datetime.combine(base_date, datetime.time(h_out, min_out))
+                delta = max(0.0, (target_dt - now).total_seconds())
+                day_label = target_dt.strftime("%b %d")
+                time_label = f"{h_out:02d}:{min_out:02d}"
 
-        if unit.startswith("w"):
-            n *= 7
+            fallback = _infer_rdv_fallback(f"{pre_task} {post_clean}", default_name)
+            name_parts = " ".join(
+                filter(None, [_clean_task_name(pre_task, ""), _clean_task_name(post_clean, "")])
+            ).strip()
 
-        now = datetime.datetime.now()
-        base_date = now.date() + datetime.timedelta(days=n)
+            if name_parts:
+                final_name = name_parts
+            elif fallback:
+                final_name = fallback
+            elif sub_sec > 0:
+                hrs = sub_sec // 3600
+                mins = (sub_sec % 3600) // 60
+                extra = f" {hrs}h" if hrs else ""
+                if mins:
+                    extra += f" {mins}m"
+                final_name = f"In {total_days}d{extra}"
+            else:
+                final_name = f"In {total_days} day{'s' if total_days != 1 else ''}"
 
-        h_out, min_out, post_clean = NaturalParser._extract_time_from_text(post_text)
-        if h_out is None or min_out is None:
-            h_out, min_out = 12, 0
-            post_clean = post_text
+            return {
+                "kind": "rendez-vous",
+                "name": final_name,
+                "seconds_from_now": max(0.0, delta),
+                "target_dt": target_dt,
+                "display_str": f"Rendez-vous: '{final_name}' on {day_label} at {time_label}",
+            }
 
-        name_parts = " ".join(filter(None, [_clean_task_name(pre_task, ""), _clean_task_name(post_clean, "")]))
-        final_name = name_parts.strip() or default_name or f"In {n} day{'s' if n != 1 else ''}"
-
-        target_dt = datetime.datetime.combine(base_date, datetime.time(h_out, min_out))
-        delta = (target_dt - now).total_seconds()
-
-        day_label = target_dt.strftime("%b %d")
-        return {
-            "kind": "rendez-vous",
-            "name": final_name,
-            "seconds_from_now": max(0.0, delta),
-            "target_dt": target_dt,
-            "display_str": f"Rendez-vous: '{final_name}' on {day_label} at {h_out:02d}:{min_out:02d}",
-        }
+        return None
 
     # ── Explicit & ordinal calendar dates ────────────────────────────────────
 

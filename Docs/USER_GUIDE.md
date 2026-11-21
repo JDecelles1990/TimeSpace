@@ -13,6 +13,7 @@
   - **Tab `5. Go ⏱️`**: Displays the compact **`⚡ Go Diagnostic & Remediation Engine`** controls and action buttons above the tabs bar.
   - **Tab `7. Settings ⚙️`**: Displays the compact **`🔊 Sound, Transparency & System Preferences`** controls above the tabs bar.
 - **Cyber-Aurora Neon Glass Design & Animated Transitions**:
+  - **Dynamic Aurora Glass Backdrop & Mouse Spotlight**: The entire TimeSpace canvas glows with a gently breathing Cyber-Aurora gradient backdrop seen through frosted translucent glass panels, shifting with active urgency/Meeting status and smoothly illuminating beneath your cursor with an interactive aurora spotlight and glass shimmer sweep on window enter.
   - **Shiny 3D Buttons & Role-Matched Halos**: All buttons feature glossy top-shine gradients at rest and smoothly animate role-matched outer neon glows on hover and specular click bursts (`Violet/Cyan` standard, `Cyan` primary actions, `Emerald` save/open actions, `Rose-Magenta` stop/delete actions, `Gold` Admin CLI).
   - **Glowing Inputs, Bars & Lists**: Text fields, spinboxes, dropdowns, and Scratchpad/Console editors glow violet on hover and electric cyan while focused; tabs, iridescent sliders, progress bars, scrollbars, splitter handles, and active list rows all illuminate with animated gradients.
   - **Radial Ring Halo & Tab Shimmer**: The countdown ring glows with a multi-stop neon gradient and specular leading tip orb, and switching tabs plays a smooth ~150ms glass shimmer fade (`TabTransitionOverlay`).
@@ -29,7 +30,7 @@
 |---|---|---|
 | **Countdown Timers** | `Ring in 15 min` · `Check backups in 45m` · `Remind me in half an hour to check backup` · `Timer for 30m review` | Starts a countdown timer immediately (supports `in an hour`, `in a minute`, `in half an hour`) |
 | **Same / Next Day RDV** | `RDV at 4PM` · `Set an alarm at 7am to stretch` · `Call Linda at 7:15 tomorrow morning` · `at noon lunch` · `at 18:30 dinner` | Schedules a calendar Rendez-vous (auto-advances to tomorrow if today's time has passed) |
-| **Relative Days / Weeks** | `Call Sam in 2 days` · `Call Sam in 2 days at 3pm` · `Call client day after tomorrow at 14h30` · `Follow up in 1 week at 10am` | Schedules a Rendez-vous `N` days/weeks ahead (defaults to `12:00` if no time specified) |
+| **Relative Days / Weeks** | `Call Sam in 2 days` · `Call Sam in 2 days at 3pm` · `RDV in 5 days and 3 hours` · `RDV in 1 week, 2 days and 30 mins` · `Call client day after tomorrow at 14h30` · `Follow up in 1 week at 10am` | Schedules a Rendez-vous `N` days/weeks ahead (supports compound sub-day offsets like `and 3 hours`, or defaults to `12:00` if no time specified) |
 | **Weekday + Ordinal Day** | `Set an alarm for Friday the 13th at 2:15 PM` · `Set an alarm for Friday the 13th at2:15 PM` · `Meeting on Monday the 16th at 10am` | Finds the next calendar date matching both the target weekday and ordinal day of the month |
 | **Ordinal Day / Calendar Dates** | `Set an alarm for the 13th at 2:15 PM` · `Pay rent on the 1st at 9am` · `Dentist on Nov 20th at 2:15 PM` · `13th of December at 10am` · `Dentist on 2026-12-05 at 14:00` · `Call client on 11/20 at 3pm` | Resolves exact ISO (`YYYY-MM-DD`), numeric (`MM/DD`), Month+Day, or next upcoming ordinal day of the month |
 | **Weekday Phrases** | `Dentist next Friday at 14:00` · `Set an alarm for Friday at 2:15 PM` · `this Friday at 3pm` · `Meeting on Wednesday at 3pm` | Schedules a Rendez-vous on the upcoming target weekday (supports conversational prefixes and `at2:15 PM` / `14h30` time notation) |
@@ -135,7 +136,7 @@
 - **Active Reminders Queue (Bottom Panel)**: Visible on Tabs 1 (`Timers`), 2 (`RDV`), and 7 (`Settings`), and automatically hidden on Tabs 3 (`Activity`), 4 (`Scratchpad`), 5 (`Go`), and 6 (`History`) to maximize workspace height. On Tabs 1 and 2, the form area hugs its natural content height so the Active Reminders Queue expands into the remaining vertical space while preserving your exact scroll position across 1-second live countdown updates. Displays each reminder's live countdown alongside the exact day of the week, date, and time it will ring (`🔔 Day, Mon DD • HH:MM:SS`). Double-click any item (or click **`✏️`**) to edit its live details inline.
 - **Bottom-Right Alarm Popup**: Triggers as a compact frameless card above the Windows system tray alongside a Windows Action Center toast.
 - **Missed & Sleep-Wake Alerts**: Automatically notifies you on startup or PC wake-up if reminders elapsed while the app was closed or the PC was asleep.
-- **📌 Floating Mini HUD**: Draggable always-on-top desktop pill showing the nearest countdown.
+- **📌 Floating Mini HUD**: Draggable translucent Cyber-Aurora always-on-top pill (`330×62`) featuring a breathing neon aura, shifting iridescent border, hover shimmer + cursor spotlight, live countdown micro-progress bar, symmetric **`⏸` / `▶`** Play/Pause for both Timers and Rendez-vous, and a **`📋`** button that opens a glowing upcoming-alarms popover card for ~4.5 seconds (hover over the popover to keep it open while inspecting queued countdowns, ring times, and notes).
 
 | Shortcut / Action | Behavior |
 |---|---|

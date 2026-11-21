@@ -109,7 +109,7 @@ Persisted as a JSON array in `data/hotstrings.json` via `Storage.load_hotstrings
 |---|---|---|
 | `window_width` / `window_height` | `650` × `800` | Default `MainApp` window geometry (minimum size `min_window_width` × `min_window_height` = `480` × `540`). |
 | `ring_size` / `ring_width` | `124` / `8` | `CircularProgressRing` square canvas size and stroke width in pixels. |
-| `hud_width` / `hud_height` | `276` × `40` | `FloatingMiniHUD` frameless desktop pill dimensions. |
+| `hud_width` / `hud_height` | `330` × `62` | `FloatingMiniHUD` frameless translucent desktop pill dimensions (`310×42` inner glass card + `10px` neon aura padding). |
 | `toast_width` / `toast_height` | `350` × `132` | Standard `AlarmDialog` bottom-right notification card dimensions. |
 | `toast_height_rich` | `162` | Expanded `AlarmDialog` height when displaying an attached `note` and/or `🔗 Open Link` button. |
 | `toast_margin_right` / `toast_margin_bottom` | `18` / `48` | Screen-edge clearance from primary monitor work area. |
@@ -120,11 +120,13 @@ Persisted as a JSON array in `data/hotstrings.json` via `Storage.load_hotstrings
 - **Typography**: `text` (`#f8fafc`), `text_muted` (`#94a3b8`).
 - **Semantic Accents**: `accent` (`#6366f1`), `accent_hover` (`#818cf8`), `accent_link` (`#38bdf8`), `accent_success` (`#10b981`), `accent_warning` (`#f59e0b`), `accent_danger` (`#f43f5e`).
 - **Glossy Controls, Inputs & Bars (`DARK_QSS`)**:
+  - **Dynamic Cyber-Aurora Backdrop & Frosted Glass (`QWidget` / `DARK_QSS`)**: `DARK_QSS` sets `QWidget` background to `transparent` (with `QMainWindow`, `QDialog`, `QMessageBox`, `QTableWidget`, and `QHeaderView::section` preserving crisp dark obsidian/surface fills) and styles `QGroupBox`, `QGroupBox::title`, `QTabWidget::pane`, `QListWidget`, `QScrollBar`, inputs, `hero_deck_frame`, `scratchpad_top_frame`, and `tab_go.console` as translucent frosted `rgba(...)` glass panels so `TimerRendezVousWidget`'s living 5-layer Cyber-Aurora gradient backdrop & cursor-tracking spotlight shine through cleanly.
   - `QGroupBox` & `QTabBar::tab`: Top specular `border_shine` gradients (`violet -> cyan` hover tabs, `cyan -> emerald` selected tabs).
   - `QPushButton`, `#primaryBtn`, `#successBtn`, `#dangerBtn`: 3D glossy rest gradients with shimmering hover gradients, `:focus` neon borders, and specular pressed bursts; paired with `ButtonGlowFilter`'s animated role-matched outer neon halos (`violet`, `cyan`, `green`, `magenta`, `gold`) across mouse hover, press, and `Tab` keyboard focus.
   - `QLineEdit`, `QPlainTextEdit`, `QTextEdit`, `QSpinBox`, `QComboBox`: Dark glass gradients transitioning to violet borders/glows on `:hover` and electric cyan borders/halos on `:focus` (`Tab` / `Shift+Tab` traverses multi-line editors via `tabChangesFocus`).
   - `QSlider`, `QProgressBar`, `QScrollBar`, `QSplitter::handle`, `QCheckBox`, `QListWidget`: Iridescent violet ➔ cyan ➔ emerald progress fills, radial orb slider handles, neon hover/drag scrollbars & splitter handles, keyboard `:focus` indicators on checkboxes/tabs/lists, and gradient list row highlights.
   - `QToolTip` & `NeonToolTip`: Cyber-Aurora dark-glass `QToolTip` QSS fallback styling in `DARK_QSS` paired with the frameless translucent `NeonToolTip` overlay (`src/neon_tooltip.py`) featuring role-matched neon outer aura, iridescent gradient border, inner left accent pill, glossy specular sheen + shimmer sweep, and smooth fade/glide transitions.
+  - `FloatingMiniHUD` & `HudUpcomingPopover`: Frameless translucent Cyber-Aurora pill (`src/mini_hud.py`) using only `COLORS` palette tokens for breathing 4-layer outer neon aura, shifting iridescent border, dark glass fill with drifting/hover-tracking aurora spotlight, bottom micro-progress strip, and a glowing auto-dismissing upcoming-alarms popover (`4500ms` countdown bar).
 - **List Density**: `QListWidget` uses `11px` font and `2px 6px` item padding so the persistent Active Reminders Queue displays 7–9+ rows simultaneously and Activity lists display ~15+ rows.
 
 ### 2.4 Shared Domain Presets

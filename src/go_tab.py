@@ -316,7 +316,7 @@ class GoTroubleshootingTab(QWidget):
             "• Click '🛡️ Admin Go CLI' (elevated) or '🚀 Standard Go CLI' (user mode) for the interactive REPL."
         )
         self.console.setStyleSheet(
-            f"QPlainTextEdit {{ background-color: {COLORS['bg_dark']}; color: {COLORS['text']}; "
+            f"QPlainTextEdit {{ background-color: rgba(12, 13, 22, 208); color: {COLORS['text']}; "
             f"border: 1px solid {COLORS['border']}; border-radius: 5px; padding: 5px; }}"
         )
         self._console_highlighter = GoConsoleHighlighter(self.console.document())

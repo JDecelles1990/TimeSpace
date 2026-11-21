@@ -31,6 +31,7 @@ from src.go_tab import GoTroubleshootingTab
 from src.ahk_manager import AHKProcessManager, find_ahk_v2_exe, generate_ahk_v2_script
 from src.ahk_dialog import AHKHotstringsDialog, AHKItemEditDialog
 from src.neon_tooltip import NeonToolTip, NeonToolTipFilter
+from src.mini_hud import FloatingMiniHUD, HudUpcomingPopover, HudAlarmEntry
 from src.gui import TimerRendezVousWidget, TimeSpaceWidget, MainApp
 
 __all__ = [
@@ -70,6 +71,9 @@ __all__ = [
     "AHKItemEditDialog",
     "NeonToolTip",
     "NeonToolTipFilter",
+    "FloatingMiniHUD",
+    "HudUpcomingPopover",
+    "HudAlarmEntry",
     "TimerRendezVousWidget",
     "TimeSpaceWidget",
     "MainApp",

@@ -245,6 +245,16 @@ class ReminderScheduler:
                     return it
         return None
 
+    def get_upcoming_items(self, now: Optional[float] = None) -> List[ScheduledItem]:
+        """Return all scheduled items sorted with running items first, then paused, by remaining time."""
+        ref_now = time.time() if now is None else now
+        with self._lock:
+            def _sort_key(it: ScheduledItem):
+                rem = it.remaining_paused if it.is_paused else max(0.0, it.target_time - ref_now)
+                return (1 if it.is_paused else 0, rem)
+
+            return sorted(list(self.items), key=_sort_key)
+
     def get_events_for_date(self, target_date: datetime.date) -> List[ScheduledItem]:
         """Return all scheduled rendez-vous falling on a specific calendar date."""
         matching: List[ScheduledItem] = []

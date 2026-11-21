@@ -47,8 +47,8 @@ UI_DIMENSIONS: Dict[str, Any] = {
     "min_window_height": 540,
     "ring_size": 124,
     "ring_width": 8,
-    "hud_width": 276,
-    "hud_height": 40,
+    "hud_width": 330,
+    "hud_height": 62,
     "toast_width": 350,
     "toast_height": 132,
     "toast_height_rich": 162,
@@ -135,10 +135,14 @@ GO_TARGET_PRESETS: List[Tuple[str, str]] = [
 # ---------------------------------------------------------------------------
 DARK_QSS = f"""
 QWidget {{
-    background-color: {COLORS["bg_dark"]};
+    background-color: transparent;
     color: {COLORS["text"]};
     font-family: "{FONT_FAMILY}", sans-serif;
     font-size: 12px;
+}}
+
+QMainWindow, QDialog, QMessageBox {{
+    background-color: {COLORS["bg_dark"]};
 }}
 
 QLabel {{
@@ -147,7 +151,7 @@ QLabel {{
 
 QGroupBox {{
     background-color: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-        stop:0 #1d213a, stop:0.12 #141625, stop:1 #0f111d);
+        stop:0 rgba(30, 34, 56, 176), stop:0.15 rgba(20, 22, 37, 156), stop:1 rgba(12, 13, 22, 176));
     border: 1px solid {COLORS["border"]};
     border-top: 1px solid {COLORS["border_shine"]};
     border-radius: 6px;
@@ -162,7 +166,8 @@ QGroupBox::title {{
     subcontrol-position: top left;
     left: 10px;
     padding: 0 5px;
-    background-color: {COLORS["bg_dark"]};
+    background-color: rgba(16, 18, 34, 215);
+    border-radius: 4px;
     color: {COLORS["glow_cyan"]};
 }}
 
@@ -170,7 +175,7 @@ QTabWidget::pane {{
     border: 1px solid {COLORS["border"]};
     border-top: 1px solid {COLORS["border_shine"]};
     border-radius: 6px;
-    background-color: {COLORS["bg_dark"]};
+    background-color: rgba(12, 13, 22, 132);
     top: -1px;
 }}
 
@@ -213,7 +218,7 @@ QTabBar::tab:focus {{
 
 QLineEdit, QPlainTextEdit, QTextEdit, QSpinBox, QComboBox {{
     background-color: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-        stop:0 #171a2e, stop:0.25 #1e2238, stop:1 #141728);
+        stop:0 rgba(23, 26, 46, 212), stop:0.25 rgba(30, 34, 56, 202), stop:1 rgba(20, 23, 40, 218));
     color: {COLORS["text"]};
     border: 1px solid {COLORS["border"]};
     border-top: 1px solid {COLORS["border_shine"]};
@@ -226,13 +231,13 @@ QLineEdit, QPlainTextEdit, QTextEdit, QSpinBox, QComboBox {{
 QLineEdit:hover, QPlainTextEdit:hover, QTextEdit:hover, QSpinBox:hover, QComboBox:hover {{
     border: 1px solid {COLORS["glow_violet_light"]};
     background-color: qlineargradient(x1:0, y1:0, x2:1, y2:1,
-        stop:0 #201e3d, stop:1 #182038);
+        stop:0 rgba(32, 30, 61, 226), stop:1 rgba(24, 32, 56, 226));
 }}
 
 QLineEdit:focus, QPlainTextEdit:focus, QTextEdit:focus, QSpinBox:focus, QComboBox:focus {{
     border: 1px solid {COLORS["glow_cyan"]};
     background-color: qlineargradient(x1:0, y1:0, x2:1, y2:1,
-        stop:0 #152538, stop:1 #14192e);
+        stop:0 rgba(21, 37, 56, 232), stop:1 rgba(20, 25, 46, 232));
 }}
 
 QComboBox::drop-down {{
@@ -253,7 +258,7 @@ QComboBox QAbstractItemView {{
 
 QListWidget {{
     background-color: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-        stop:0 #16192c, stop:1 #0e101c);
+        stop:0 rgba(22, 25, 44, 192), stop:1 rgba(12, 13, 22, 202));
     color: {COLORS["text"]};
     border: 1px solid {COLORS["border"]};
     border-top: 1px solid {COLORS["border_shine"]};
@@ -283,6 +288,25 @@ QListWidget::item:hover:!selected {{
     background-color: qlineargradient(x1:0, y1:0, x2:1, y2:0,
         stop:0 #28244d, stop:1 #1b2f45);
     color: {COLORS["glow_specular"]};
+}}
+
+QTableWidget {{
+    background-color: rgba(16, 18, 34, 225);
+    alternate-background-color: rgba(24, 28, 48, 220);
+    color: {COLORS["text"]};
+    gridline-color: {COLORS["border"]};
+    border: 1px solid {COLORS["border"]};
+    border-radius: 5px;
+    selection-background-color: {COLORS["glow_violet"]};
+    selection-color: #ffffff;
+}}
+
+QHeaderView::section {{
+    background-color: {COLORS["surface_light"]};
+    color: {COLORS["glow_cyan"]};
+    border: 1px solid {COLORS["border"]};
+    padding: 4px 6px;
+    font-weight: bold;
 }}
 
 QPushButton {{
@@ -479,7 +503,7 @@ QProgressBar::chunk {{
 }}
 
 QScrollBar:vertical {{
-    background: #0e101d;
+    background: rgba(14, 16, 29, 145);
     width: 8px;
     margin: 0px;
     border-radius: 4px;
@@ -509,7 +533,7 @@ QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {{
 }}
 
 QScrollBar:horizontal {{
-    background: #0e101d;
+    background: rgba(14, 16, 29, 145);
     height: 8px;
     margin: 0px;
     border-radius: 4px;
