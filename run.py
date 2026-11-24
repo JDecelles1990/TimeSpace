@@ -4,10 +4,11 @@ import os
 import subprocess
 import sys
 
-PROJECT_DIR = os.path.dirname(os.path.abspath(__file__))
-os.chdir(PROJECT_DIR)
-if PROJECT_DIR not in sys.path:
-    sys.path.insert(0, PROJECT_DIR)
+IS_FROZEN = bool(getattr(sys, "frozen", False))
+APP_DIR = os.path.dirname(os.path.abspath(sys.executable)) if IS_FROZEN else os.path.dirname(os.path.abspath(__file__))
+os.chdir(APP_DIR)
+if not IS_FROZEN and APP_DIR not in sys.path:
+    sys.path.insert(0, APP_DIR)
 
 _INSTANCE_MUTEX = None
 
@@ -32,11 +33,13 @@ def _acquire_single_instance_mutex() -> bool:
 
 def _ensure_pyside6_interpreter() -> None:
     """If launched with a global Python missing PySide6, auto-relaunch via local .venv if available."""
+    if IS_FROZEN:
+        return
     try:
         import PySide6  # noqa: F401
         return
     except ImportError:
-        venv_python = os.path.join(PROJECT_DIR, ".venv", "Scripts", "python.exe")
+        venv_python = os.path.join(APP_DIR, ".venv", "Scripts", "python.exe")
         script_path = os.path.abspath(__file__)
         if os.path.exists(venv_python) and os.path.normcase(sys.executable) != os.path.normcase(venv_python):
             sys.exit(subprocess.call([venv_python, script_path, *sys.argv[1:]]))
@@ -44,6 +47,8 @@ def _ensure_pyside6_interpreter() -> None:
 
 
 if __name__ == "__main__":
+    if "--no-startup-sync" in sys.argv:
+        os.environ["TIMESPACE_NO_STARTUP_SYNC"] = "1"
     _ensure_pyside6_interpreter()
     if not _acquire_single_instance_mutex():
         sys.exit(0)

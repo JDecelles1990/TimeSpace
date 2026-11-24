@@ -16,16 +16,13 @@ import socket
 import ssl
 import subprocess
 import sys
+import threading
 import time
 import urllib.error
 import urllib.request
 from typing import Dict, Any, List, Optional, Tuple
 
-_REPO_ROOT = Path(__file__).resolve().parent.parent
-if str(_REPO_ROOT) not in sys.path:
-    sys.path.insert(0, str(_REPO_ROOT))
-
-from PySide6.QtCore import Qt, QProcess, Signal
+from PySide6.QtCore import Qt, QProcess, QThread, Signal
 from PySide6.QtGui import (
     QColor,
     QFont,
@@ -52,7 +49,100 @@ from PySide6.QtWidgets import (
 )
 
 from src.config import COLORS, GO_DIAG_ACTIONS, GO_TARGET_PRESETS
+from src.paths import get_app_dir, get_bundle_root, get_data_dir, get_go_binary_path, is_frozen
 from src.storage import Storage
+
+_WIN_NO_WINDOW = getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000) if sys.platform == "win32" else 0
+
+_BUNDLE_ROOT = get_bundle_root()
+if not is_frozen() and str(_BUNDLE_ROOT) not in sys.path:
+    sys.path.insert(0, str(_BUNDLE_ROOT))
+
+
+class _SubprocessRunner(QThread):
+    """Non-blocking subprocess stream worker suppressing Windows console flashes via CREATE_NO_WINDOW."""
+
+    stdoutLine = Signal(str)
+    stderrLine = Signal(str)
+    processFinished = Signal(int)
+    processError = Signal(str)
+
+    def __init__(
+        self,
+        program: str,
+        args: List[str],
+        cwd: str,
+        env: Optional[Dict[str, str]] = None,
+        parent: Optional[QWidget] = None,
+    ) -> None:
+        super().__init__(parent)
+        self._program = program
+        self._args = list(args)
+        self._cwd = cwd
+        self._env = env
+        self._proc: Optional[subprocess.Popen] = None
+        self._stop_requested = False
+
+    def stop(self) -> None:
+        self._stop_requested = True
+        proc = self._proc
+        if proc is not None and proc.poll() is None:
+            try:
+                proc.terminate()
+            except OSError:
+                pass
+            try:
+                proc.wait(timeout=0.5)
+            except subprocess.TimeoutExpired:
+                try:
+                    proc.kill()
+                except OSError:
+                    pass
+
+    def run(self) -> None:
+        kwargs: Dict[str, Any] = {
+            "cwd": self._cwd or None,
+            "env": self._env,
+            "stdout": subprocess.PIPE,
+            "stderr": subprocess.PIPE,
+            "stdin": subprocess.DEVNULL,
+        }
+        if _WIN_NO_WINDOW:
+            kwargs["creationflags"] = _WIN_NO_WINDOW
+
+        try:
+            self._proc = subprocess.Popen([self._program, *self._args], **kwargs)
+        except Exception as exc:
+            self.processError.emit(str(exc))
+            return
+
+        def _drain_stderr() -> None:
+            if self._proc is None or self._proc.stderr is None:
+                return
+            try:
+                for raw in iter(self._proc.stderr.readline, b""):
+                    line = raw.decode("utf-8", errors="replace").rstrip("\r\n")
+                    if line:
+                        self.stderrLine.emit(line)
+            except Exception:
+                pass
+
+        err_thread = threading.Thread(target=_drain_stderr, daemon=True)
+        err_thread.start()
+
+        try:
+            if self._proc.stdout is not None:
+                for raw in iter(self._proc.stdout.readline, b""):
+                    line = raw.decode("utf-8", errors="replace").rstrip("\r\n")
+                    if line:
+                        self.stdoutLine.emit(line)
+        except Exception as exc:
+            if not self._stop_requested:
+                self.processError.emit(str(exc))
+
+        err_thread.join(timeout=1.0)
+        rc = self._proc.wait()
+        self.processFinished.emit(int(rc))
 
 
 class GoConsoleHighlighter(QSyntaxHighlighter):
@@ -105,12 +195,12 @@ class GoTroubleshootingTab(QWidget):
         custom_targets: Optional[List[Dict[str, str]]] = None,
     ):
         super().__init__(parent)
-        self._repo_root: Path = Path(__file__).resolve().parent.parent
-        self._go_engine_dir: Path = self._repo_root / "go_engine"
+        self._app_root: Path = get_app_dir()
+        self._repo_root: Path = get_bundle_root()
+        self._go_engine_dir: Path = self._app_root / "go_engine"
         self._bin_dir: Path = self._repo_root / "bin"
 
-        self._process: Optional[QProcess] = None
-        self._stdout_buffer: str = ""
+        self._runner: Optional[_SubprocessRunner] = None
         self._pending_json_payload: Optional[Dict[str, Any]] = None
         self._current_action: str = ""
         self._current_target: str = ""
@@ -148,7 +238,11 @@ class GoTroubleshootingTab(QWidget):
 
         self.btn_build_bins = QPushButton("🔨")
         self.btn_build_bins.setFixedSize(26, 22)
-        self.btn_build_bins.setToolTip("Cross-compile Go binaries into /bin via go_engine/build_all.ps1")
+        if is_frozen():
+            self.btn_build_bins.setEnabled(False)
+            self.btn_build_bins.setToolTip("Go binary is pre-bundled in this standalone release")
+        else:
+            self.btn_build_bins.setToolTip("Cross-compile Go binaries into /bin via go_engine/build_all.ps1")
         self.btn_build_bins.setCursor(Qt.CursorShape.PointingHandCursor)
         self.btn_build_bins.clicked.connect(self.build_go_binaries)
         mode_row.addWidget(self.btn_build_bins)
@@ -463,7 +557,11 @@ class GoTroubleshootingTab(QWidget):
             return None
 
     def build_go_binaries(self) -> None:
-        if self._process is not None and self._process.state() != QProcess.ProcessState.NotRunning:
+        if is_frozen():
+            self._append_line("[INFO] Go binaries are pre-bundled in the standalone release.")
+            return
+
+        if self._runner is not None and self._runner.isRunning():
             self._append_line("[WARN] A process is already running. Stop it or wait before building.")
             return
 
@@ -485,33 +583,21 @@ class GoTroubleshootingTab(QWidget):
             self._append_line("[ERROR] PowerShell ('pwsh' / 'powershell') not found on PATH to run build_all.ps1.")
             return
 
-        self._stdout_buffer = ""
         self._pending_json_payload = None
         self._current_action = "build-binaries"
         self._current_target = "all-platforms"
         self._append_line(f"🔨 [Build Engine] Running {build_script.name} (CGO_ENABLED=0)...")
 
-        self._process = QProcess(self)
-        self._process.setWorkingDirectory(str(self._go_engine_dir))
-        self._process.readyReadStandardOutput.connect(self._on_stdout_ready)
-        self._process.readyReadStandardError.connect(self._on_stderr_ready)
-        self._process.finished.connect(self._on_process_finished)
-        self._process.errorOccurred.connect(self._on_process_error)
-
         self._set_running_ui_state(True, "Building Go binaries...")
         args = ["-NoProfile", "-File", str(build_script)]
         if sys.platform == "win32":
             args = ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", str(build_script)]
-        self._process.start(shell_exe, args)
+        self._start_runner(shell_exe, args, str(self._go_engine_dir))
 
-    # ── Binary & Toolchain Resolution (pathlib.Path only) ────────────────────
+    # ── Binary & Toolchain Resolution (frozen-safe via src.paths) ────────────
 
     def _resolve_binary_path(self) -> Path:
-        if sys.platform == "win32":
-            return self._bin_dir / "diag_windows.exe"
-        if sys.platform == "darwin":
-            return self._bin_dir / "diag_mac_arm64"
-        return self._bin_dir / "diag_linux"
+        return get_go_binary_path()
 
     def _detect_engine_badge(self) -> str:
         bin_path = self._resolve_binary_path()
@@ -519,7 +605,7 @@ class GoTroubleshootingTab(QWidget):
             return f"Binary ready ({bin_path.name})"
         if shutil.which("go"):
             return "Go CLI detected on PATH"
-        return "Fallback ready"
+        return "Frozen missing Go binary" if is_frozen() else "Fallback ready"
 
     # ── External Interactive Go CLI Launcher (Standard User vs Elevated Admin) ──
 
@@ -534,17 +620,23 @@ class GoTroubleshootingTab(QWidget):
         elevate = self.elevate_checkbox.isChecked() if elevate_override is None else bool(elevate_override)
         cli_mode = "admin" if elevate else "user"
         binary_path = self._resolve_binary_path()
+        data_dir_str = str(get_data_dir())
 
         if binary_path.exists():
             cli_cmd = f'"{binary_path}" --interactive --cli-mode={cli_mode} --target={target}'
             work_dir = str(binary_path.parent)
-        elif shutil.which("go") and self._go_engine_dir.exists():
+        elif not is_frozen() and shutil.which("go") and self._go_engine_dir.exists():
             cli_cmd = f"go run . --interactive --cli-mode={cli_mode} --target={target}"
             work_dir = str(self._go_engine_dir)
-        else:
+        elif not is_frozen():
             script_path = Path(__file__).resolve()
             cli_cmd = f'"{sys.executable}" "{script_path}" --fallback-cli --interactive --cli-mode={cli_mode} --target={target}'
-            work_dir = str(self._repo_root)
+            work_dir = str(self._app_root)
+        else:
+            self._append_line(f"[ERROR] Bundled Go diagnostic binary not found at {binary_path}")
+            self.lbl_run_state.setText("Binary missing")
+            self.lbl_run_state.setStyleSheet(f"color: {COLORS['accent_danger']}; font-size: 11px; font-weight: bold;")
+            return
 
         mode_str = "ELEVATED ADMIN CLI" if elevate else "STANDARD USER CLI"
         self._append_line(f"🚀 [EXEC] Spawning external {mode_str} for target: {target}")
@@ -554,7 +646,8 @@ class GoTroubleshootingTab(QWidget):
             shell_path = shutil.which("pwsh") or shutil.which("powershell") or "powershell.exe"
             ps_invoke = cli_cmd if cli_cmd.startswith("go ") else f"& {cli_cmd}"
             safe_work_dir = work_dir.replace("'", "''")
-            ps_script = f"Set-Location -LiteralPath '{safe_work_dir}'; {ps_invoke}"
+            safe_data_dir = data_dir_str.replace("'", "''")
+            ps_script = f"$env:TIMESPACE_DATA_DIR = '{safe_data_dir}'; Set-Location -LiteralPath '{safe_work_dir}'; {ps_invoke}"
             encoded_cmd = base64.b64encode(ps_script.encode("utf-16le")).decode("ascii")
             operation = "runas" if elevate else "open"
             params = f"-NoExit -EncodedCommand {encoded_cmd}"
@@ -565,13 +658,14 @@ class GoTroubleshootingTab(QWidget):
                 started = False
 
         elif sys.platform.startswith("linux"):
-            inner_cmd = f"sudo {cli_cmd}" if elevate else cli_cmd
+            sudo_prefix = "sudo -E " if elevate else ""
+            env_cmd = f"TIMESPACE_DATA_DIR='{data_dir_str}' {sudo_prefix}{cli_cmd}"
             linux_terminals = [
-                ("x-terminal-emulator", ["-e", f"bash -c '{inner_cmd}; exec bash'"]),
-                ("gnome-terminal", ["--", "bash", "-c", f"{inner_cmd}; exec bash"]),
-                ("konsole", ["--hold", "-e", "bash", "-c", inner_cmd]),
-                ("xfce4-terminal", ["--hold", "-e", f"bash -c '{inner_cmd}'"]),
-                ("xterm", ["-hold", "-e", inner_cmd]),
+                ("x-terminal-emulator", ["-e", f"bash -c '{env_cmd}; exec bash'"]),
+                ("gnome-terminal", ["--", "bash", "-c", f"{env_cmd}; exec bash"]),
+                ("konsole", ["--hold", "-e", "bash", "-c", env_cmd]),
+                ("xfce4-terminal", ["--hold", "-e", f"bash -c '{env_cmd}'"]),
+                ("xterm", ["-hold", "-e", env_cmd]),
             ]
             for term_bin, term_args in linux_terminals:
                 if shutil.which(term_bin):
@@ -580,7 +674,8 @@ class GoTroubleshootingTab(QWidget):
                         break
 
         elif sys.platform == "darwin":
-            mac_cmd = f"sudo {cli_cmd}" if elevate else cli_cmd
+            sudo_prefix = "sudo -E " if elevate else ""
+            mac_cmd = f"TIMESPACE_DATA_DIR='{data_dir_str}' {sudo_prefix}{cli_cmd}"
             apple_script = (
                 f'tell application "Terminal"\n'
                 f"    activate\n"
@@ -598,10 +693,22 @@ class GoTroubleshootingTab(QWidget):
             self.lbl_run_state.setText("Terminal launch canceled")
             self.lbl_run_state.setStyleSheet(f"color: {COLORS['accent_danger']}; font-size: 11px; font-weight: bold;")
 
-    # ── Asynchronous QProcess Execution ──────────────────────────────────────
+    # ── Asynchronous Subprocess Execution (Zero Console Flashes) ─────────────
+
+    def _start_runner(self, program: str, args: List[str], working_dir: str) -> None:
+        child_env = os.environ.copy()
+        child_env["TIMESPACE_DATA_DIR"] = str(get_data_dir())
+        runner = _SubprocessRunner(program, args, working_dir, env=child_env, parent=self)
+        runner.stdoutLine.connect(self._process_output_line)
+        runner.stderrLine.connect(lambda ln: self._append_line(f"[STDERR] {ln}"))
+        runner.processFinished.connect(self._on_process_finished)
+        runner.processError.connect(self._on_process_error)
+        runner.finished.connect(runner.deleteLater)
+        self._runner = runner
+        runner.start()
 
     def run_diagnostic(self, action: str) -> None:
-        if self._process is not None and self._process.state() != QProcess.ProcessState.NotRunning:
+        if self._runner is not None and self._runner.isRunning():
             self._append_line("[WARN] A diagnostic process is already running. Stop it or wait for completion.")
             return
 
@@ -611,7 +718,6 @@ class GoTroubleshootingTab(QWidget):
 
         self._current_action = action
         self._current_target = target
-        self._stdout_buffer = ""
         self._pending_json_payload = None
 
         mode = self.combo_mode.currentData() or "binary"
@@ -620,13 +726,13 @@ class GoTroubleshootingTab(QWidget):
 
         program: str = ""
         args: List[str] = []
-        working_dir: Path = self._repo_root
+        working_dir: Path = self._app_root
 
         if mode == "binary" and bin_path.exists():
             program = str(bin_path)
             args = [f"--action={action}", f"--target={target}", *extra_args]
             self._append_line(f"▶ [Binary Mode] {bin_path.name} --action={action} --target={target}")
-        elif mode == "go_run" and go_exe:
+        elif not is_frozen() and mode == "go_run" and go_exe:
             program = go_exe
             args = ["run", ".", f"--action={action}", f"--target={target}", *extra_args]
             working_dir = self._go_engine_dir
@@ -637,15 +743,22 @@ class GoTroubleshootingTab(QWidget):
             self._append_line(
                 f"ℹ️ 'go' toolchain not found on PATH; using compiled binary {bin_path.name}..."
             )
-        elif go_exe:
+        elif not is_frozen() and go_exe and self._go_engine_dir.exists():
             program = go_exe
             args = ["run", ".", f"--action={action}", f"--target={target}", *extra_args]
             working_dir = self._go_engine_dir
             self._append_line(
                 f"ℹ️ Compiled binary '{bin_path.name}' not found in /bin; falling back to 'go run .' in go_engine/..."
             )
+        elif is_frozen():
+            self._append_line(
+                f"[ERROR] Bundled Go diagnostic binary '{bin_path.name}' was not found at: {bin_path}"
+            )
+            self.lbl_run_state.setText("Binary missing")
+            self.lbl_run_state.setStyleSheet(f"color: {COLORS['accent_danger']}; font-size: 11px; font-weight: bold;")
+            return
         else:
-            # Graceful non-blocking QProcess fallback when neither compiled binary nor Go compiler is installed yet
+            # Graceful non-blocking subprocess fallback when running from source without Go or compiled binary
             self._append_line(
                 f"ℹ️ '{bin_path.name}' not built yet & 'go' not on PATH (compile anytime via '🔨 Build Binaries')."
             )
@@ -661,19 +774,13 @@ class GoTroubleshootingTab(QWidget):
                 *extra_args,
             ]
 
-        self._process = QProcess(self)
-        self._process.setWorkingDirectory(str(working_dir))
-        self._process.readyReadStandardOutput.connect(self._on_stdout_ready)
-        self._process.readyReadStandardError.connect(self._on_stderr_ready)
-        self._process.finished.connect(self._on_process_finished)
-        self._process.errorOccurred.connect(self._on_process_error)
-
         self._set_running_ui_state(True, f"Running {action} on {target}...")
-        self._process.start(program, args)
+        self._start_runner(program, args, str(working_dir))
 
     def stop_process(self) -> None:
-        if self._process is not None and self._process.state() != QProcess.ProcessState.NotRunning:
-            self._process.kill()
+        if self._runner is not None and self._runner.isRunning():
+            self._runner.stop()
+            self._runner.wait(1500)
             self._append_line("⏹ [STOPPED] Diagnostic process terminated by user.")
             self._set_running_ui_state(False, "Stopped")
 
@@ -683,25 +790,6 @@ class GoTroubleshootingTab(QWidget):
         self.lbl_run_state.setStyleSheet(f"color: {COLORS['text_muted']}; font-size: 11px;")
 
     # ── Stream & JSON Signal Handlers ────────────────────────────────────────
-
-    def _on_stdout_ready(self) -> None:
-        if not self._process:
-            return
-        raw_bytes = self._process.readAllStandardOutput().data()
-        text = raw_bytes.decode("utf-8", errors="replace")
-        self._stdout_buffer += text
-        while "\n" in self._stdout_buffer:
-            line, self._stdout_buffer = self._stdout_buffer.split("\n", 1)
-            self._process_output_line(line.rstrip("\r"))
-
-    def _on_stderr_ready(self) -> None:
-        if not self._process:
-            return
-        raw_bytes = self._process.readAllStandardError().data()
-        text = raw_bytes.decode("utf-8", errors="replace")
-        for line in text.splitlines():
-            if line.strip():
-                self._append_line(f"[STDERR] {line.strip()}")
 
     def _process_output_line(self, line: str) -> None:
         stripped = line.strip()
@@ -726,12 +814,10 @@ class GoTroubleshootingTab(QWidget):
                 pass
         self._append_line(stripped)
 
-    def _on_process_finished(self, exit_code: int, _exit_status: QProcess.ExitStatus) -> None:
-        self._on_stdout_ready()
-        if self._stdout_buffer.strip():
-            for rem_line in self._stdout_buffer.splitlines():
-                self._process_output_line(rem_line)
-            self._stdout_buffer = ""
+    def _on_process_finished(self, exit_code: int) -> None:
+        if self._runner is not None and self._runner.isRunning():
+            self._runner.wait(500)
+        self._runner = None
 
         completed_payload = self._pending_json_payload
         self._pending_json_payload = None
@@ -752,8 +838,9 @@ class GoTroubleshootingTab(QWidget):
         if completed_payload is not None:
             self.diagnostic_completed.emit(completed_payload)
 
-    def _on_process_error(self, error: QProcess.ProcessError) -> None:
-        self._append_line(f"[ERROR] QProcess error occurred ({error}).")
+    def _on_process_error(self, error_msg: str) -> None:
+        self._runner = None
+        self._append_line(f"[ERROR] Failed to execute diagnostic process: {error_msg}")
         self._set_running_ui_state(False, "Process error")
 
     def _set_running_ui_state(self, running: bool, state_text: Optional[str] = None) -> None:
@@ -952,6 +1039,7 @@ def _fallback_dns_lookup(target: str) -> Tuple[str, bool]:
                     capture_output=True,
                     text=True,
                     timeout=3,
+                    creationflags=_WIN_NO_WINDOW,
                 )
                 matched = [
                     ln.strip()
@@ -1021,7 +1109,13 @@ def _fallback_os_action(action: str) -> Tuple[str, bool]:
     if not cmd:
         return f"Unsupported action: {action}", False
     try:
-        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=8)
+        proc = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            timeout=8,
+            creationflags=_WIN_NO_WINDOW,
+        )
         out = (proc.stdout or "") + (proc.stderr or "")
         return out.strip(), proc.returncode == 0
     except Exception as exc:
@@ -1092,7 +1186,12 @@ def _copy_to_system_clipboard(text: str) -> Tuple[bool, str]:
     if sys.platform == "win32":
         try:
             payload = b"\xff\xfe" + text.encode("utf-16le")
-            proc = subprocess.run(["clip"], input=payload, timeout=5)
+            proc = subprocess.run(
+                ["clip"],
+                input=payload,
+                timeout=5,
+                creationflags=_WIN_NO_WINDOW,
+            )
             return proc.returncode == 0, "" if proc.returncode == 0 else f"clip exited {proc.returncode}"
         except Exception as exc:
             return False, str(exc)

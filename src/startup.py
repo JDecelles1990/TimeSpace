@@ -3,13 +3,14 @@ import os
 import sys
 import winreg
 from src.config import APP_REGISTRY_NAME
+from src.paths import get_app_dir, is_frozen
 
 _RUN_REG_PATH = r"Software\Microsoft\Windows\CurrentVersion\Run"
 _APPROVED_RUN_REG_PATH = r"Software\Microsoft\Windows\CurrentVersion\Explorer\StartupApproved\Run"
 
 
 def _get_project_dir() -> str:
-    return os.path.abspath(os.path.dirname(os.path.dirname(__file__)))
+    return str(get_app_dir())
 
 
 def get_startup_vbs_path() -> str:
@@ -28,6 +29,9 @@ def get_startup_vbs_path() -> str:
 
 def get_executable_command() -> str:
     """Return the exact command to run this application at Windows startup."""
+    if is_frozen():
+        return f'"{os.path.abspath(sys.executable)}" --minimized'
+
     project_dir = _get_project_dir()
     main_script = os.path.join(project_dir, "run.py")
 

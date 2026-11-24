@@ -65,6 +65,10 @@ func runOSAction(action string, target string) (string, error) {
 		return "", fmt.Errorf("unsupported Windows action: %s", action)
 	}
 
+	cmd.SysProcAttr = &syscall.SysProcAttr{
+		HideWindow:    true,
+		CreationFlags: 0x08000000, // CREATE_NO_WINDOW
+	}
 	out, err := cmd.CombinedOutput()
 	text := strings.TrimSpace(string(out))
 	if err != nil {

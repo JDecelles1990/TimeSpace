@@ -1,0 +1,82 @@
+name: Release Windows Desktop
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Release version (e.g. 3.24.0)"
+        required: false
+        default: ""
+
+permissions:
+  contents: write
+
+jobs:
+  build-windows:
+    name: Build Windows x64 Portable Release
+    runs-on: windows-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Go toolchain
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go_engine/go.mod
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Create .venv & install Python dependencies + PyInstaller
+        shell: pwsh
+        run: |
+          python -m venv .venv
+          .\.venv\Scripts\python.exe -m pip install --upgrade pip
+          .\.venv\Scripts\python.exe -m pip install -r requirements.txt "pyinstaller>=6.11"
+
+      - name: Determine release version
+        id: ver
+        shell: pwsh
+        run: |
+          $v = "${{ github.event.inputs.version }}"
+          if (-not $v) {
+            if ("${{ github.ref_type }}" -eq "tag") {
+              $v = "${{ github.ref_name }}".TrimStart("v")
+            } else {
+              $v = "3.24.0"
+            }
+          }
+          "version=$v" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+
+      - name: Build TimeSpace (Stage 1 Go CLI + Stage 2 PyInstaller)
+        shell: pwsh
+        run: .\build.ps1 -Version "${{ steps.ver.outputs.version }}"
+
+      - name: Smoke test bundled Go diagnostic binary
+        shell: pwsh
+        run: |
+          $goBin = "dist\TimeSpace\_internal\bin\diag_windows.exe"
+          & $goBin --action=ping --target=127.0.0.1
+          if ($LASTEXITCODE -ne 0 -and $LASTEXITCODE -ne 1) { exit $LASTEXITCODE }
+
+      - name: Upload workflow build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: TimeSpace-v${{ steps.ver.outputs.version }}-win64
+          path: |
+            dist/TimeSpace-v${{ steps.ver.outputs.version }}-win64.zip
+            dist/TimeSpace-v${{ steps.ver.outputs.version }}-win64.zip.sha256
+
+      - name: Publish GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          files: |
+            dist/TimeSpace-v${{ steps.ver.outputs.version }}-win64.zip
+            dist/TimeSpace-v${{ steps.ver.outputs.version }}-win64.zip.sha256

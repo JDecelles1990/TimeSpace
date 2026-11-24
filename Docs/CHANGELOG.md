@@ -5,6 +5,19 @@
 
 ---
 
+## [v3.24.0] — Standalone Windows Release Packaging, Bundled Go CLI & CI Workflow (2026-11-24)
+- **Frozen-Safe Asset & Writable Data Resolution (`src/paths.py`, `run.py`, `src/storage.py`, `src/startup.py`, `src/config.py`, `src/__init__.py`)**:
+  - Added `src/paths.py` (`is_frozen`, `get_bundle_root`, `get_app_dir`, `get_resource_path`, `get_go_binary_path`, `get_data_dir`, `get_reports_dir`) separating read-only PyInstaller bundle assets (`sys._MEIPASS`) from writable user state (`%APPDATA%\TimeSpace\data` by default when frozen, `<exe_dir>\data` with `portable.flag`/existing dir, `TIMESPACE_DATA_DIR` override, and `<repo>/data` in dev mode).
+  - Updated `run.py` and `src/startup.py` so frozen builds keep CWD on `dirname(sys.executable)`, skip `.venv` relaunch, register `TimeSpace.exe --minimized` cleanly for boot startup, and honor `--no-startup-sync` / `TIMESPACE_NO_STARTUP_SYNC=1`.
+  - Added `APP_VERSION = "3.24.0"` and multi-resolution Cyber-Aurora icon `assets/timespace.ico` wired into `TimeSpace.exe` and `MainApp.setWindowIcon()`.
+- **Zero-Console-Flash Subprocess Execution (`src/go_tab.py`, `go_engine/fixes_windows.go`, `go_engine/main.go`)**:
+  - Replaced `QProcess` for non-interactive diagnostics with `_SubprocessRunner(QThread)` using `subprocess.Popen(..., creationflags=subprocess.CREATE_NO_WINDOW)` and `TIMESPACE_DATA_DIR` forwarding so `diag_windows.exe` never flashes a console window and REPL `bm` bookmarks share the active `settings.json`.
+  - Added `SysProcAttr{HideWindow: true, CreationFlags: 0x08000000}` in `go_engine/fixes_windows.go` and `CREATE_NO_WINDOW` to Windows fallback `subprocess.run` calls.
+- **Two-Stage Build Pipeline & CI (`build.ps1`, `TimeSpace.spec`, `.github/workflows/release.yml`, `.gitignore`)**:
+  - Added `build.ps1` (Stage 1 `GOOS=windows GOARCH=amd64 CGO_ENABLED=0` Go build -> Stage 2 PyInstaller `--onedir` `--noconsole` bundle + `.zip` & `.sha256`), `TimeSpace.spec` excluding unused heavy Qt modules, `.gitignore` rules for `build/`/`dist/`/`*.zip`/`bin/diag_*`, and standalone tag-triggered `.github/workflows/release.yml`.
+
+---
+
 ## [v3.23] — Natural Schedule Compound Relative Durations & RDV Label Preservation (2026-11-20)
 - **Compound Relative Duration Parsing (`src/natural_parser.py`)**:
   - Added `_consume_compound_duration()` (`_COMPOUND_UNIT_RE`, `_COMPOUND_CONNECTOR_RE`) supporting multi-unit durations chained with spaces, commas, `and`, or `+` (e.g., `"RDV in 5 days and 3 hours"`, `"RDV in 5 days, 3 hours and 20 minutes"`, `"RDV in 5d 3h 15m"`, `"RDV in 5 days and half an hour"`, `"RDV in 1 week and 2 days"`).

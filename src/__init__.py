@@ -1,6 +1,7 @@
 """TimeSpace application package (PySide6 F7Hub Module & Standalone App)."""
 from src.config import (
     APP_TITLE,
+    APP_VERSION,
     APP_REGISTRY_NAME,
     HOTKEY,
     FONT_FAMILY,
@@ -23,6 +24,15 @@ from src.config import (
     DEFAULT_AHK_HOTSTRINGS,
     MEETING_HOTKEY,
 )
+from src.paths import (
+    is_frozen,
+    get_bundle_root,
+    get_app_dir,
+    get_resource_path,
+    get_go_binary_path,
+    get_data_dir,
+    get_reports_dir,
+)
 from src.storage import Storage
 from src.scheduler import ReminderScheduler, ScheduledItem
 from src.hotkey_manager import GlobalHotkeyListener
@@ -36,7 +46,15 @@ from src.gui import TimerRendezVousWidget, TimeSpaceWidget, MainApp
 
 __all__ = [
     "APP_TITLE",
+    "APP_VERSION",
     "APP_REGISTRY_NAME",
+    "is_frozen",
+    "get_bundle_root",
+    "get_app_dir",
+    "get_resource_path",
+    "get_go_binary_path",
+    "get_data_dir",
+    "get_reports_dir",
     "HOTKEY",
     "FONT_FAMILY",
     "COLORS",

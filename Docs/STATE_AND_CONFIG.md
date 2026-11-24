@@ -99,6 +99,7 @@ Persisted as a JSON array in `data/hotstrings.json` via `Storage.load_hotstrings
 
 ### 2.1 Identity & Shortcut Constants
 - `APP_TITLE = "TimeSpace"` — Window title, tray title, and Windows Action Center toast `app_id`.
+- `APP_VERSION = "3.24.0"` — Application and release bundle version string.
 - `APP_REGISTRY_NAME = "TimeSpace"` — Registry value name under `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`.
 - `HOTKEY = "ctrl+f8"` — Global show/hide hotkey parsed by `GlobalHotkeyListener`.
 - `MEETING_HOTKEY = "ctrl+shift+m"` — Global Meeting Mode toggle hotkey parsed by `GlobalHotkeyListener`.
@@ -143,9 +144,15 @@ Persisted as a JSON array in `data/hotstrings.json` via `Storage.load_hotstrings
 
 ---
 
-## 3. JSON Files & Legacy Compatibility (`src/storage.py`)
+## 3. JSON Files, Frozen Storage Resolution & Legacy Compatibility (`src/storage.py`, `src/paths.py`)
 
-All runtime state is stored locally in `data/` (auto-created on first call via `Storage._ensure_dir()`):
+Runtime state is resolved by `src/paths.py` (`get_data_dir()`) so frozen PyInstaller builds never write inside `_internal/`:
+1. **`TIMESPACE_DATA_DIR`**: Explicit environment variable override (highest priority).
+2. **Dev mode** (`python run.py`): `<repo_root>/data/`.
+3. **Frozen portable mode**: `<exe_dir>/data/` if a `portable.flag` file or writable `<exe_dir>/data` folder sits beside `TimeSpace.exe`.
+4. **Frozen default**: `%APPDATA%\TimeSpace\data\` on Windows (`~/.local/share/TimeSpace/data/` elsewhere).
+
+Reports export (`get_reports_dir()`) targets `C:\Temp` on Windows (or `/tmp`) with automatic fallback to `<data_dir>/reports/` if unavailable. State files stored inside `DATA_DIR`:
 - `data/settings.json` — `AppConfig` object (`data/settings.example.json` provides a tracked reference template).
 - `data/reminders.json` — Array of active `ScheduledItem` dicts.
 - `data/history.json` — Array of `HistoryEntry` dicts (max 100).

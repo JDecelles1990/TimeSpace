@@ -96,6 +96,7 @@ from src.ahk_dialog import AHKHotstringsDialog
 from src.storage import DEFAULT_AHK_SCRIPT_FILE
 from src.meeting_detector import is_microphone_in_use, get_active_microphone_apps
 from src.neon_tooltip import NeonToolTipFilter
+from src.paths import get_resource_path
 
 
 _URL_TOKEN_RE = re.compile(r"(?:https?://|www\.)[^\s<>\"']+", re.IGNORECASE)
@@ -887,7 +888,7 @@ class TimerRendezVousWidget(QWidget):
             QTimer.singleShot(800, self._show_hud)
         if self.app_config.ahk_auto_start:
             QTimer.singleShot(1200, self._auto_start_ahk_script)
-        if self.app_config.start_on_boot and not is_startup_enabled():
+        if self.app_config.start_on_boot and not os.environ.get("TIMESPACE_NO_STARTUP_SYNC") and not is_startup_enabled():
             set_startup_enabled(True)
 
     def _init_aurora_backdrop(self) -> None:
@@ -3920,6 +3921,11 @@ class MainApp(QMainWindow):
         self._qt_app = QApplication.instance() or QApplication(sys.argv)
         super().__init__()
         self.setWindowTitle(f"{APP_TITLE} ⏰")
+        icon_path = get_resource_path("assets", "timespace.ico")
+        if icon_path.exists():
+            app_icon = QIcon(str(icon_path))
+            self.setWindowIcon(app_icon)
+            self._qt_app.setWindowIcon(app_icon)
         self.resize(UI_DIMENSIONS["window_width"], UI_DIMENSIONS["window_height"])
         self.setMinimumSize(
             UI_DIMENSIONS.get("min_window_width", 480),
@@ -4021,6 +4027,8 @@ class MainApp(QMainWindow):
             self._meeting_hotkey_listener.stop()
         if self.module_widget.hud:
             self.module_widget.hud.close()
+        if hasattr(self.module_widget, "tab_go"):
+            self.module_widget.tab_go.stop_process()
         if hasattr(self.module_widget, "ahk_manager") and self.module_widget.ahk_manager.is_running():
             self.module_widget.ahk_manager.stop_script()
         if self._qt_app is not None:

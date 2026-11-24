@@ -6,6 +6,7 @@ from typing import Dict, Any, Tuple, List
 # Application Metadata & Global Shortcuts
 # ---------------------------------------------------------------------------
 APP_TITLE = "TimeSpace"
+APP_VERSION = "3.24.0"
 APP_REGISTRY_NAME = "TimeSpace"
 HOTKEY = "ctrl+f8"
 MEETING_HOTKEY = "ctrl+shift+m"

@@ -38,6 +38,13 @@ python run.py
 ```
 *(Note: `run.py` automatically delegates to `.venv\Scripts\python.exe` if invoked from a global Python environment missing `PySide6`. Pass `--minimized` to start hidden in the System Tray.)*
 
+### 3. Build Standalone Windows Release (`TimeSpace.exe` + Bundled Go CLI)
+```powershell
+.\.venv\Scripts\python.exe -m pip install "pyinstaller>=6.11"
+.\build.ps1
+```
+Produces the portable release folder `dist/TimeSpace/` (containing `TimeSpace.exe` and `_internal/bin/diag_windows.exe`) alongside `dist/TimeSpace-v3.24.0-win64.zip` and its `.sha256` checksum. Standalone builds store user data in `%APPDATA%\TimeSpace\data` by default (or `<exe_dir>\data` if `portable.flag` or a sibling `data/` directory is present).
+
 ---
 
 ## 📚 Canonical Documentation

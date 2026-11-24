@@ -32,3 +32,13 @@ data/hotstrings.ahk
 !data/.gitkeep
 !data/settings.example.json
 reports/
+
+# Packaging, compiled Go CLIs & PyInstaller artifacts
+build/
+dist/
+*.zip
+*.sha256
+bin/diag_windows.exe
+bin/diag_linux
+bin/diag_mac_arm64
+!bin/.gitkeep

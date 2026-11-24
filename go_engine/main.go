@@ -303,9 +303,14 @@ func parseREPLSelection(raw string, adminMode bool) ([]string, error) {
 }
 
 func handleBookmarksCommand(input string, currentTarget string, pBold string, okCol string, failCol string, rst string) string {
-	settingsPath := filepath.Join("..", "data", "settings.json")
-	if _, err := os.Stat(settingsPath); os.IsNotExist(err) {
-		settingsPath = filepath.Join("data", "settings.json")
+	settingsPath := ""
+	if envDir := strings.TrimSpace(os.Getenv("TIMESPACE_DATA_DIR")); envDir != "" {
+		settingsPath = filepath.Join(envDir, "settings.json")
+	} else {
+		settingsPath = filepath.Join("..", "data", "settings.json")
+		if _, err := os.Stat(settingsPath); os.IsNotExist(err) {
+			settingsPath = filepath.Join("data", "settings.json")
+		}
 	}
 	rawCfg := make(map[string]interface{})
 	if b, err := os.ReadFile(settingsPath); err == nil {
